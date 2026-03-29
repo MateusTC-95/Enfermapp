@@ -1,5 +1,10 @@
 <?php
 // o porteiro ne
+
+// caso de erro, o free infinity mostra
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 // Config de acesso - permite que o app (q ta em outro lugar) conversa com o PHP
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
