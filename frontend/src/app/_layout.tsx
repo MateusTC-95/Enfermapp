@@ -1,16 +1,46 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import React from 'react';
-import { useColorScheme } from 'react-native';
+import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+// impede que a tela de abertura (Splash) suma rápido demais
+// Isso evita aquele "flash" branco antes do app carregar os dados.
+SplashScreen.preventAutoHideAsync();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+export default function RootLayout() {
+  
+  useEffect(() => {
+    // quando o componente carregar, mandamos a Splash sumir
+    SplashScreen.hideAsync();
+  }, []);
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    // O 'Stack' é o tipo de navegação (uma tela em cima da outra, como pilhas de cartas)
+    <Stack screenOptions={{ headerShown: true }}>
+      
+      {/* definimos a tela de Login (index) como a principal e SEM barra no topo */}
+      <Stack.Screen 
+        name="index" 
+        options={{ 
+          headerShown: false 
+        }} 
+      />
+
+      {/* configuramos os nomes que aparecerão no topo das outras telas */}
+      <Stack.Screen 
+        name="cliente/dashboard" 
+        options={{ title: 'Área do Paciente' }} 
+      />
+      
+      <Stack.Screen 
+        name="profissional/dashboard" 
+        options={{ title: 'Área do Profissional' }} 
+      />
+
+      <Stack.Screen 
+        name="admin/dashboard" 
+        options={{ title: 'Painel Admin' }} 
+      />
+
+    </Stack>
   );
 }
