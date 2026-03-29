@@ -2,30 +2,50 @@ import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 
-// impede que a tela de abertura (Splash) suma rápido demais
-// Isso evita aquele "flash" branco antes do app carregar os dados.
+// Impede que a tela de abertura (Splash) suma rápido demais
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   
   useEffect(() => {
-    // quando o componente carregar, mandamos a Splash sumir
+    // Quando o app carregar, esconde a Splash Screen
     SplashScreen.hideAsync();
   }, []);
 
   return (
-    // O 'Stack' é o tipo de navegação (uma tela em cima da outra, como pilhas de cartas)
-    <Stack screenOptions={{ headerShown: true }}>
+    <Stack 
+      screenOptions={{ 
+        headerShown: true, // Padrão para as telas internas
+        headerTitleStyle: { fontWeight: 'bold' },
+      }}
+    >
       
-      {/* definimos a tela de Login (index) como a principal e SEM barra no topo */}
+      {/*TELA INICIAL (Boas-vindas com os 2 botões) */}
       <Stack.Screen 
         name="index" 
+        options={{ headerShown: false }} 
+      />
+
+      {/*TELA DE FORMULÁRIO DE LOGIN */}
+      <Stack.Screen 
+        name="login" 
         options={{ 
-          headerShown: false 
+          headerShown: false, // Deixamos falso pra usar o design do prototipo
+          title: 'Entrar' 
         }} 
       />
 
-      {/* configuramos os nomes que aparecerão no topo das outras telas */}
+      {/*TELA DE FORMULÁRIO DE CADASTRO */}
+      <Stack.Screen 
+        name="cadastro" 
+        options={{ 
+          headerShown: false, // Deixamos falso para manter o padrão visual
+          title: 'Criar Conta' 
+        }} 
+      />
+
+      {/* --- DASHBOARDS (Áreas Restritas) --- */}
+      
       <Stack.Screen 
         name="cliente/dashboard" 
         options={{ title: 'Área do Paciente' }} 

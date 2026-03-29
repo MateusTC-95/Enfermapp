@@ -1,72 +1,80 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
-import api from '../services/api'; 
 
-export default function LoginScreen() {
-  const [usuario, setUsuario] = useState('');
-  const [senha, setSenha] = useState('');
+export default function WelcomeScreen() {
   const router = useRouter();
 
-  const handleLogin = async () => {
-    if (!usuario || !senha) {
-      Alert.alert("Erro", "Preencha todos os campos.");
-      return;
-    }
-
-    try {
-      const response = await api.post('index.php', {
-        nome_usuario: usuario,
-        senha: senha
-      });
-
-      if (response.data.status === "sucesso") {
-        const tipo = response.data.dados.tipo; // 'admin', 'profissional' ou 'cliente'
-        Alert.alert("Sucesso", `Bem-vindo, ${response.data.dados.nome}`);
-        
-        // Navega para a pasta correta baseada no tipo de usuário
-        // @ts-ignore
-router.replace(`/${tipo}/dashboard` as any);
-      } else {
-        Alert.alert("Erro", response.data.message);
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Erro", "Não foi possível conectar ao servidor.");
-    }
-  };
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Enfermapp</Text>
-      
-      <TextInput 
-        style={styles.input} 
-        placeholder="Usuário" 
-        value={usuario}
-        onChangeText={setUsuario}
-        autoCapitalize="none"
-      />
-      
-      <TextInput 
-        style={styles.input} 
-        placeholder="Senha" 
-        secureTextEntry 
-        value={senha}
-        onChangeText={setSenha}
-      />
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Enfermapp</Text>
 
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Entrar</Text>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.buttonContainer}>
+          {/* Botão de Login - Azul Escuro */}
+          <TouchableOpacity 
+            style={[styles.button, styles.loginButton]} 
+            onPress={() => router.push('/login')}
+          >
+            <Text style={styles.buttonText}>LOGIN</Text>
+          </TouchableOpacity>
+
+          {/* Botão de Cadastro - Verde Oliva */}
+          <TouchableOpacity 
+            style={[styles.button, styles.registerButton]} 
+            onPress={() => router.push('/cadastro')}
+          >
+            <Text style={styles.buttonText}>CADASTRE-SE</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', padding: 20, backgroundColor: '#fff' },
-  title: { fontSize: 32, fontWeight: 'bold', textAlign: 'center', marginBottom: 40, color: '#6200ee' },
-  input: { borderWidth: 1, borderColor: '#ccc', padding: 15, borderRadius: 8, marginBottom: 15 },
-  button: { backgroundColor: '#6200ee', padding: 15, borderRadius: 8, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+  },
+  title: {
+    fontSize: 48,
+    fontWeight: '400', // Estilo mais limpo como no print
+    color: '#000',
+    marginBottom: 100,
+  },
+  buttonContainer: {
+    width: '100%',
+    gap: 20, // Espaçamento entre os botões
+  },
+  button: {
+    width: '100%',
+    height: 70,
+    borderRadius: 50, // Bem arredondado como no print
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3, // Sombrinha leve
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  loginButton: {
+    backgroundColor: '#06bbe9', // cor do login
+  },
+  registerButton: {
+    backgroundColor: '#606c38', // cor do cadastro
+  },
+  buttonText: {
+    color: '#000', // cor do enfermapp
+    fontSize: 24,
+    fontWeight: '500',
+    letterSpacing: 1.5,
+  },
 });
