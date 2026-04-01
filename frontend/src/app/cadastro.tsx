@@ -1,25 +1,25 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
-// import das função do react ( o react, as funções e o use router (bilioteca de navegação))
 
 export default function CadastroScreen() {
-  const router = useRouter(); // variavel do router
-  const [tipo, setTipo] = useState(''); // variavel do tipo da conta
-  const [showDropdown, setShowDropdown] = useState(false); // dropdown (quando a lista desce)
+  const router = useRouter(); 
+  const [tipo, setTipo] = useState(''); 
+  const [showDropdown, setShowDropdown] = useState(false); 
 
   const handleNext = () => {
     if (!tipo) {
-      alert("Por favor, selecione o tipo de conta."); // alerta caso n escolham a conta 
+      alert("Por favor, selecione o tipo de conta."); 
       return;
     }
-    // Lógica para ir para o Passo 2 = router.push('/cadastro_passo2')
-  };
+    
+    // Navega para o passo 2
+    router.push('/cadastro_passo2'); 
+  }; // <--- Aqui fechou o handleNext corretamente
 
-  return (
+  return ( // <--- Agora o return está dentro de CadastroScreen
     <SafeAreaView style={styles.container}>
       <View style={styles.form}>
-        
         
         <Text style={styles.stepText}>Passo 1/3</Text>
 
@@ -28,14 +28,11 @@ export default function CadastroScreen() {
         <View style={styles.dropdownContainer}>
           <TouchableOpacity 
             style={styles.dropdownHeader} 
-            onPress={() => setShowDropdown(!showDropdown)} // pra listinha aparecer quando clica
+            onPress={() => setShowDropdown(!showDropdown)}
           >
-
-          
             <Text style={styles.inputText}>{tipo || ""}</Text>
-            <Text style={styles.arrow}>{showDropdown ? '↑' : '↑'}</Text> 
+            <Text style={styles.arrow}>{showDropdown ? '↑' : '↓'}</Text> 
           </TouchableOpacity> 
-        
 
           {showDropdown && (
             <View style={styles.dropdownOptions}>
