@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export default function CadastroScreen() {
@@ -9,19 +9,25 @@ export default function CadastroScreen() {
 
   const handleNext = () => {
     if (!tipo) {
-      alert("Por favor, selecione o tipo de conta."); 
+      Alert.alert("Erro", "Por favor, selecione o tipo de conta."); 
       return;
     }
     
-    // Navega para o passo 2
-    router.push('/cadastro_passo2'); 
-  }; // <--- Aqui fechou o handleNext corretamente
+    // Agora enviamos o parâmetro 'tipo' para o próximo passo
+    router.push({
+      pathname: '/cadastro_passo2',
+      params: { tipo: tipo.toLowerCase() } // Enviamos 'cliente' ou 'profissional'
+    }); 
+  }; 
 
-  return ( // <--- Agora o return está dentro de CadastroScreen
+  return (
     <SafeAreaView style={styles.container}>
       <View style={styles.form}>
         
-        <Text style={styles.stepText}>Passo 1/3</Text>
+        {/* Texto do Passo dinâmico: mostra 1/5 para profissional e 1/3 para cliente */}
+        <Text style={styles.stepText}>
+          {tipo.toLowerCase() === 'profissional' ? 'Passo 1/5' : 'Passo 1/3'}
+        </Text>
 
         <Text style={styles.label}>Selecione o Tipo de Conta</Text>
         
@@ -52,6 +58,7 @@ export default function CadastroScreen() {
           )}
         </View>
 
+        {/* Mantendo o estilo do botão azul conforme sua print */}
         <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.nextButtonText}>PRÓXIMO</Text>
         </TouchableOpacity>
@@ -74,7 +81,7 @@ const styles = StyleSheet.create({
   },
   stepText: {
     fontSize: 40,
-    color: '#00ff00', 
+    color: '#00ff00', // Verde vibrante da print
     fontWeight: '400',
     marginBottom: 40,
   },
@@ -89,7 +96,7 @@ const styles = StyleSheet.create({
     marginBottom: 60,
   },
   dropdownHeader: { 
-    backgroundColor: '#8b8682', 
+    backgroundColor: '#8b8682', // Cinza padrão
     height: 50, 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
@@ -119,7 +126,7 @@ const styles = StyleSheet.create({
     color: '#000' 
   },
   nextButton: { 
-    backgroundColor: '#808000', 
+    backgroundColor: '#0077c2', // Azul atualizado da print
     width: 180, 
     height: 110, 
     justifyContent: 'center', 

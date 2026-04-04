@@ -1,47 +1,63 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
-export default function CadastroScreen() {
-  const router = useRouter(); 
-  const [tipo, setTipo] = useState(''); 
-  const [showDropdown, setShowDropdown] = useState(false); 
+export default function CadastroPasso3() {
+  const router = useRouter();
+  const { tipo } = useLocalSearchParams(); // Recebe 'cliente' ou 'profissional'
+
+  const [cidade, setCidade] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const cidades = ['Mococa, SP']; // Lista de exemplo
 
   const handleNext = () => {
-    if (!tipo) {
-      alert("Por favor, selecione a cidade."); 
+    if (!cidade) {
+      Alert.alert("Erro", "Por favor, selecione sua cidade.");
       return;
     }
-    
-    // Navega para o passo 2
-    router.push('/cadastro_passo3'); 
-  }; // <--- Aqui fechou o handleNext corretamente
 
-  return ( // <--- Agora o return está dentro de CadastroScreen
+    if (tipo === 'profissional') {
+      // Profissional vai para o Passo 4
+      router.push({
+        pathname: '/cadastro_passo4',
+        params: { tipo: tipo, cidade: cidade }
+      });
+    } else {
+      // Cliente finaliza aqui
+      Alert.alert("Sucesso", "Cadastro concluído!");
+      router.replace('/cliente/dashboard');
+    }
+  };
+
+  return (
     <SafeAreaView style={styles.container}>
       <View style={styles.form}>
         
-        <Text style={styles.stepText}>Passo 3/3</Text>
+        {/* Passo dinâmico */}
+        <Text style={styles.stepText}>
+          {tipo === 'profissional' ? 'Passo 3/5' : 'Passo 3/3'}
+        </Text>
 
-        <Text style={styles.label}>Selecione a cidade</Text>
+        <Text style={styles.label}>Selecione sua Cidade</Text>
         
         <View style={styles.dropdownContainer}>
           <TouchableOpacity 
             style={styles.dropdownHeader} 
             onPress={() => setShowDropdown(!showDropdown)}
           >
-            <Text style={styles.inputText}>{tipo || ""}</Text>
+            <Text style={styles.inputText}>{cidade || "Clique para selecionar"}</Text>
             <Text style={styles.arrow}>{showDropdown ? '↑' : '↓'}</Text> 
           </TouchableOpacity> 
 
           {showDropdown && (
             <View style={styles.dropdownOptions}>
-              {['Mococa, SP'].map((item) => (
+              {cidades.map((item) => (
                 <TouchableOpacity 
                   key={item} 
                   style={styles.option} 
                   onPress={() => { 
-                    setTipo(item); 
+                    setCidade(item); 
                     setShowDropdown(false); 
                   }}
                 >
@@ -53,7 +69,13 @@ export default function CadastroScreen() {
         </View>
 
         <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.nextButtonText}>PRÓXIMO</Text>
+          <Text style={styles.nextButtonText}>
+            {tipo === 'profissional' ? 'PRÓXIMO' : 'FINALIZAR'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Text style={styles.backButtonText}>Voltar</Text>
         </TouchableOpacity>
 
       </View>
@@ -82,7 +104,7 @@ const styles = StyleSheet.create({
     fontSize: 22, 
     color: '#000', 
     alignSelf: 'flex-start',
-    marginBottom: 5,
+    marginBottom: 10,
   },
   dropdownContainer: {
     width: '100%',
@@ -99,35 +121,42 @@ const styles = StyleSheet.create({
     borderBottomColor: '#000'
   },
   inputText: { 
-    fontSize: 20, 
+    fontSize: 18, 
     color: '#000' 
   },
   arrow: { 
-    fontSize: 30, 
-    fontWeight: '400',
+    fontSize: 25, 
   },
   dropdownOptions: { 
     backgroundColor: '#8b8682', 
+    maxHeight: 200, // Limita a altura se tiver muitas cidades
   },
   option: { 
-    padding: 12, 
-    borderBottomWidth: 0.5, 
+    padding: 15, 
+    borderBottomWidth: 1, 
     borderBottomColor: '#7a7571' 
   },
   optionText: { 
-    fontSize: 20, 
+    fontSize: 18, 
     color: '#000' 
   },
   nextButton: { 
-    backgroundColor: '#808000', 
+    backgroundColor: '#0077c2', 
     width: 180, 
-    height: 110, 
+    height: 100, 
     justifyContent: 'center', 
     alignItems: 'center', 
   },
   nextButtonText: { 
     color: '#000', 
-    fontSize: 28, 
-    fontWeight: '400', 
+    fontSize: 26, 
+    fontWeight: 'bold', 
   },
+  backButton: {
+    marginTop: 20
+  },
+  backButtonText: {
+    color: '#8b8682',
+    fontSize: 16
+  }
 });

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router'; // Importação atualizada
 
 export default function CadastroPasso2() {
   const router = useRouter();
+  const { tipo } = useLocalSearchParams(); // Pega o tipo (cliente ou profissional)
 
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
@@ -11,13 +12,8 @@ export default function CadastroPasso2() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
 
   const handleNext = () => {
-    if (!nome) {
-      alert("Por favor, preencha seu nome.");
-      return;
-    }
-
-    if (!senha || !confirmarSenha) {
-      alert("Preencha ambos os campos de senha.");
+    if (!nome || !senha || !confirmarSenha) {
+      alert("Por favor, preencha todos os campos.");
       return;
     }
 
@@ -26,14 +22,21 @@ export default function CadastroPasso2() {
       return;
     }
 
-    router.push('/cadastro_passo3');
+    // Passa o tipo para a próxima tela também para continuar a contagem lá
+    router.push({
+      pathname: '/cadastro_passo3',
+      params: { tipo: tipo }
+    });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.form}>
         
-        <Text style={styles.stepText}>Passo 2/3</Text>
+        {/* Lógica dinâmica do passo */}
+        <Text style={styles.stepText}>
+          {tipo === 'profissional' ? 'Passo 2/5' : 'Passo 2/3'}
+        </Text>
 
         <Text style={styles.label}>Crie seu Nome de Usuário</Text>
         <TextInput 
@@ -52,7 +55,6 @@ export default function CadastroPasso2() {
             onChangeText={setSenha}
             secureTextEntry={!mostrarSenha}
           />
-          
           <TouchableOpacity onPress={() => setMostrarSenha(!mostrarSenha)}>
             <Text style={styles.eye}>{mostrarSenha ? '🔒' : '🔓'}</Text>
           </TouchableOpacity>
