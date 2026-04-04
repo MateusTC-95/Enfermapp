@@ -13,10 +13,11 @@ export default function CadastroScreen() {
       return;
     }
     
-    // Agora enviamos o parâmetro 'tipo' para o próximo passo
+    // Agora enviamos o parâmetro 'tipo' (em minúsculo) para o próximo passo
+    // Isso é importante para bater com o ENUM do seu Banco de Dados ('cliente','profissional')
     router.push({
       pathname: '/cadastro_passo2',
-      params: { tipo: tipo.toLowerCase() } // Enviamos 'cliente' ou 'profissional'
+      params: { tipo_conta: tipo.toLowerCase() } 
     }); 
   }; 
 
@@ -58,7 +59,7 @@ export default function CadastroScreen() {
           )}
         </View>
 
-        {/* Mantendo o estilo do botão azul conforme sua print */}
+        {/* Botão azul conforme sua print */}
         <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.nextButtonText}>PRÓXIMO</Text>
         </TouchableOpacity>
@@ -81,7 +82,7 @@ const styles = StyleSheet.create({
   },
   stepText: {
     fontSize: 40,
-    color: '#00ff00', // Verde vibrante da print
+    color: '#00ff00', 
     fontWeight: '400',
     marginBottom: 40,
   },
@@ -96,7 +97,7 @@ const styles = StyleSheet.create({
     marginBottom: 60,
   },
   dropdownHeader: { 
-    backgroundColor: '#8b8682', // Cinza padrão
+    backgroundColor: '#8b8682', 
     height: 50, 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
@@ -126,7 +127,7 @@ const styles = StyleSheet.create({
     color: '#000' 
   },
   nextButton: { 
-    backgroundColor: '#0077c2', // Azul atualizado da print
+    backgroundColor: '#0077c2', 
     width: 180, 
     height: 110, 
     justifyContent: 'center', 

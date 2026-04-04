@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Image, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Image, ActivityIndicator, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function TelaPagamento() {
   const router = useRouter();
-  const { plano } = useLocalSearchParams(); // Recebe o plano escolhido na tela anterior
+  // PEGA TUDO: nome, senha, tipo, cidade, foto_coren e plano!
+  const params = useLocalSearchParams(); 
   
   const [comprovante, setComprovante] = useState<string | null>(null);
   const [aguardando, setAguardando] = useState(false);
@@ -14,7 +15,7 @@ export default function TelaPagamento() {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      quality: 1,
+      quality: 0.5,
     });
 
     if (!result.canceled) {
@@ -22,14 +23,62 @@ export default function TelaPagamento() {
     }
   };
 
-  const finalizarPagamento = () => {
-    // Aqui você faria a chamada para o seu Back-end para criar a conta
+  const finalizarPagamento = async () => {
     setAguardando(true);
-    
-    // Simulação: Após 4 segundos, ele poderia ser redirecionado ou apenas ficar na tela
-    // No cenário real, aqui a conta já estaria salva no banco como "pendente"
+
+    try {
+      // 1. Prepara o objeto com todos os dados acumulados
+      const dadosCadastro = {
+        acao: "cadastrar",
+        nome_usuario: params.nome_usuario,
+        senha: params.senha,
+        tipo_conta: params.tipo_conta,
+        cidade: params.cidade,
+        plano: params.plano,
+        foto_coren: params.foto_coren || null, 
+        comprovante_pix: comprovante || null
+      };
+
+      // 2. Chamada ao servidor com Headers de navegador para evitar bloqueio
+      const response = await fetch('http://enfermapp.great-site.net/backend/public/index.php', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(dadosCadastro),
+      });
+
+      // 3. Captura como texto primeiro para investigar possíveis erros HTML do InfinityFree
+      const respostaTexto = await response.text();
+      console.log("RESPOSTA BRUTA DO SERVIDOR:", respostaTexto);
+
+      // 4. Tenta converter para JSON
+      try {
+        const resultado = JSON.parse(respostaTexto);
+        
+        if (resultado.status === "sucesso") {
+          console.log("Cadastro salvo com sucesso!");
+          // Mantém a tela de 'aguardando' ativa conforme sua lógica
+        } else {
+          setAguardando(false);
+          Alert.alert("Erro no Cadastro", resultado.message || "O servidor recusou os dados.");
+        }
+      } catch (e) {
+        setAguardando(false);
+        console.error("Erro ao converter JSON. O servidor mandou HTML.");
+        Alert.alert("Erro de Servidor", "O InfinityFree bloqueou a conexão do App. Tente abrir o link do backend no navegador do celular uma vez e tente de novo.");
+      }
+
+    } catch (error) {
+      setAguardando(false);
+      Alert.alert("Erro de Conexão", "Não foi possível contatar o servidor.");
+      console.error(error);
+    }
   };
 
+  // TELA DE AGUARDANDO APROVAÇÃO (RENDERIZAÇÃO CONDICIONAL)
   if (aguardando) {
     return (
       <SafeAreaView style={styles.container}>
@@ -55,10 +104,10 @@ export default function TelaPagamento() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         
         <Text style={styles.mainTitle}>
-          Finalize sua inscrição efetuando o pagamento do seu plano
+          Finalize sua inscrição efetuando o pagamento do seu plano {params.plano === 'premium' ? 'Premium' : 'Normal'}
         </Text>
 
-        {/* Card do PIX (Estilo image_ac4a0f) */}
+        {/* Card do PIX */}
         <View style={styles.pixCard}>
           <View style={styles.pixHeader}>
             <Text style={styles.pixHeaderText}>pix</Text>
@@ -67,8 +116,8 @@ export default function TelaPagamento() {
           <View style={styles.pixBody}>
             <Text style={styles.pixInfoText}>• Chave PIX:</Text>
             <Text style={styles.pixKey}>enfermapp@gmail.com</Text>
-            <Text style={styles.pixInfoText}>Telefone de Contato:</Text>
-            <Text style={styles.pixKey}>+55 19 4002-8922</Text>
+            <Text style={styles.pixInfoText}>Valor do Plano:</Text>
+            <Text style={styles.pixKey}>{params.plano === 'premium' ? 'R$ 69,00' : 'R$ 49,00'}</Text>
           </View>
         </View>
 
@@ -91,7 +140,6 @@ export default function TelaPagamento() {
           </TouchableOpacity>
         </View>
 
-        {/* Botão Pagamento Efetuado (Estilo image_ac4a4e) */}
         <TouchableOpacity style={styles.payButton} onPress={finalizarPagamento}>
           <Text style={styles.payButtonText}>Pagamento Efetuado</Text>
         </TouchableOpacity>

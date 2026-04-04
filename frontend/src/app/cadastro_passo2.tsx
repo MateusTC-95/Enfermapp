@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, TextInput } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router'; // Importação atualizada
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, TextInput, Alert } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 export default function CadastroPasso2() {
   const router = useRouter();
-  const { tipo } = useLocalSearchParams(); // Pega o tipo (cliente ou profissional)
+  const { tipo_conta } = useLocalSearchParams(); // Pega o tipo vindo do Passo 1
 
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
@@ -12,20 +12,26 @@ export default function CadastroPasso2() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
 
   const handleNext = () => {
+    // Validação básica de campos vazios
     if (!nome || !senha || !confirmarSenha) {
-      alert("Por favor, preencha todos os campos.");
+      Alert.alert("Erro", "Por favor, preencha todos os campos.");
       return;
     }
 
+    // Validação de coincidência de senha
     if (senha !== confirmarSenha) {
-      alert("As senhas não coincidem!");
+      Alert.alert("Erro", "As senhas não coincidem!");
       return;
     }
 
-    // Passa o tipo para a próxima tela também para continuar a contagem lá
+    // Navega para o Passo 3 levando o "pacotão" de dados acumulados
     router.push({
       pathname: '/cadastro_passo3',
-      params: { tipo: tipo }
+      params: { 
+        tipo_conta: tipo_conta, 
+        nome_usuario: nome, 
+        senha: senha 
+      }
     });
   };
 
@@ -33,17 +39,19 @@ export default function CadastroPasso2() {
     <SafeAreaView style={styles.container}>
       <View style={styles.form}>
         
-        {/* Lógica dinâmica do passo */}
+        {/* Lógica dinâmica do passo baseada no tipo de conta */}
         <Text style={styles.stepText}>
-          {tipo === 'profissional' ? 'Passo 2/5' : 'Passo 2/3'}
+          {tipo_conta === 'profissional' ? 'Passo 2/5' : 'Passo 2/3'}
         </Text>
 
         <Text style={styles.label}>Crie seu Nome de Usuário</Text>
         <TextInput 
           style={styles.input}
           placeholder="Digite seu nome"
+          placeholderTextColor="#444"
           value={nome}
           onChangeText={setNome}
+          autoCapitalize="none" // Importante para nomes de usuário
         />
 
         <Text style={styles.label}>Crie uma senha</Text>
@@ -51,6 +59,7 @@ export default function CadastroPasso2() {
           <TextInput 
             style={styles.inputFlex}
             placeholder="Digite sua senha"
+            placeholderTextColor="#444"
             value={senha}
             onChangeText={setSenha}
             secureTextEntry={!mostrarSenha}
@@ -64,6 +73,7 @@ export default function CadastroPasso2() {
         <TextInput 
           style={styles.input}
           placeholder="Digite novamente sua senha"
+          placeholderTextColor="#444"
           value={confirmarSenha}
           onChangeText={setConfirmarSenha}
           secureTextEntry={!mostrarSenha}
@@ -135,7 +145,7 @@ const styles = StyleSheet.create({
     fontSize: 22
   },
   nextButton: { 
-    backgroundColor: '#808000', 
+    backgroundColor: '#0077c2', // Ajustado para o azul padrão dos outros botões
     width: 180, 
     height: 110, 
     justifyContent: 'center', 

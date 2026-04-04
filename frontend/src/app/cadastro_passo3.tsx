@@ -4,12 +4,13 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 
 export default function CadastroPasso3() {
   const router = useRouter();
-  const { tipo } = useLocalSearchParams(); // Recebe 'cliente' ou 'profissional'
+  // Pegamos TUDO que veio dos passos anteriores
+  const { tipo_conta, nome_usuario, senha } = useLocalSearchParams(); 
 
   const [cidade, setCidade] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
 
-  const cidades = ['Mococa, SP']; // Lista de exemplo
+  const cidades = ['Mococa, SP', 'Arceburgo, MG', 'Tapiratiba, SP']; // Adicionei mais algumas da região
 
   const handleNext = () => {
     if (!cidade) {
@@ -17,16 +18,25 @@ export default function CadastroPasso3() {
       return;
     }
 
-    if (tipo === 'profissional') {
-      // Profissional vai para o Passo 4
+    if (tipo_conta === 'profissional') {
+      // Profissional: Passa o "pacotão" completo para o Passo 4 (Documentos)
       router.push({
         pathname: '/cadastro_passo4',
-        params: { tipo: tipo, cidade: cidade }
+        params: { 
+            tipo_conta, 
+            nome_usuario, 
+            senha, 
+            cidade 
+        }
       });
     } else {
-      // Cliente finaliza aqui
-      Alert.alert("Sucesso", "Cadastro concluído!");
-      router.replace('/cliente/dashboard');
+      // Cliente: Aqui termina a jornada de coleta. 
+      // No futuro, aqui dispararemos o fetch para o seu index.php
+      Alert.alert(
+        "Quase lá!", 
+        "Cadastro de cliente recebido. Vamos te redirecionar!",
+        [{ text: "OK", onPress: () => router.replace('/cliente/dashboard') }]
+      );
     }
   };
 
@@ -34,9 +44,9 @@ export default function CadastroPasso3() {
     <SafeAreaView style={styles.container}>
       <View style={styles.form}>
         
-        {/* Passo dinâmico */}
+        {/* Passo dinâmico: 3/5 para Profissional ou 3/3 para Cliente */}
         <Text style={styles.stepText}>
-          {tipo === 'profissional' ? 'Passo 3/5' : 'Passo 3/3'}
+          {tipo_conta === 'profissional' ? 'Passo 3/5' : 'Passo 3/3'}
         </Text>
 
         <Text style={styles.label}>Selecione sua Cidade</Text>
@@ -70,7 +80,7 @@ export default function CadastroPasso3() {
 
         <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.nextButtonText}>
-            {tipo === 'profissional' ? 'PRÓXIMO' : 'FINALIZAR'}
+            {tipo_conta === 'profissional' ? 'PRÓXIMO' : 'FINALIZAR'}
           </Text>
         </TouchableOpacity>
 
@@ -86,30 +96,30 @@ export default function CadastroPasso3() {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#fff' 
-  },
+    backgroundColor: '#fff'
+   },
   form: { 
     flex: 1, 
     paddingHorizontal: 40, 
     alignItems: 'center',
-    paddingTop: 80
-  },
-  stepText: {
-    fontSize: 40,
+     paddingTop: 80 
+    },
+  stepText: { 
+    fontSize: 40, 
     color: '#00ff00', 
-    fontWeight: '400',
-    marginBottom: 40,
+    fontWeight: '400', 
+    marginBottom: 40 
   },
   label: { 
     fontSize: 22, 
     color: '#000', 
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-  },
-  dropdownContainer: {
-    width: '100%',
-    marginBottom: 60,
-  },
+    alignSelf: 'flex-start', 
+    marginBottom: 10
+   },
+  dropdownContainer: { 
+    width: '100%', 
+    marginBottom: 60, 
+    zIndex: 10 },
   dropdownHeader: { 
     backgroundColor: '#8b8682', 
     height: 50, 
@@ -120,16 +130,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 3,
     borderBottomColor: '#000'
   },
-  inputText: { 
-    fontSize: 18, 
-    color: '#000' 
-  },
-  arrow: { 
-    fontSize: 25, 
-  },
+  inputText: { fontSize: 18, color: '#000' },
+  arrow: { fontSize: 25 },
   dropdownOptions: { 
     backgroundColor: '#8b8682', 
-    maxHeight: 200, // Limita a altura se tiver muitas cidades
+    maxHeight: 200,
+    width: '100%',
+    position: 'absolute',
+    top: 50,
   },
   option: { 
     padding: 15, 
@@ -142,21 +150,20 @@ const styles = StyleSheet.create({
   },
   nextButton: { 
     backgroundColor: '#0077c2', 
-    width: 180, 
-    height: 100, 
+    width: 180, height: 100, 
     justifyContent: 'center', 
-    alignItems: 'center', 
+    alignItems: 'center' 
   },
   nextButtonText: { 
     color: '#000', 
     fontSize: 26, 
-    fontWeight: 'bold', 
+    fontWeight: 'bold' 
   },
-  backButton: {
-    marginTop: 20
+  backButton: { 
+    marginTop: 20 
   },
-  backButtonText: {
-    color: '#8b8682',
-    fontSize: 16
+  backButtonText: { 
+    color: '#8b8682', 
+    fontSize: 16 
   }
 });

@@ -1,47 +1,46 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Image } from 'react-native';
-import { useRouter } from 'expo-router';
-// 1. Importar a biblioteca
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Image, Alert } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
 export default function CadastroPasso4() {
   const router = useRouter();
+  // Recebe os dados acumulados (tipo_conta, nome, senha, cidade)
+  const params = useLocalSearchParams(); 
   
-  // O estado 'image' agora vai guardar a URI (o endereço) da foto real
   const [image, setImage] = useState(null);
   const [isWaiting, setIsWaiting] = useState(false);
 
-  // 2. Função para abrir a galeria
   const pickImage = async () => {
-    // Pede permissão para acessar a galeria
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (status !== 'granted') {
-      alert("Precisamos de permissão para acessar suas fotos!");
+      Alert.alert("Permissão Necessária", "Precisamos de acesso às suas fotos para validar seu registro.");
       return;
     }
 
-    // Abre o seletor de imagens
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true, // Permite cortar a foto
+      allowsEditing: true,
       aspect: [4, 3],
-      quality: 1,
+      quality: 0.5, // Reduzi a qualidade para 0.5 para não travar o app no envio futuro
     });
 
     if (!result.canceled) {
-      setImage(result.assets[0].uri); // Salva o caminho da imagem escolhida
+      setImage(result.assets[0].uri);
     }
   };
 
   const handleSend = () => {
     if (!image) {
-      alert("Anexe a imagem antes de continuar.");
+      Alert.alert("Aviso", "Por favor, anexe a imagem do seu COREN para continuar.");
       return;
     }
+    // Ativa a tela de "sucesso/aguardando"
     setIsWaiting(true);
   };
 
+  // Tela de Simulação de Envio
   if (isWaiting) {
     return (
       <SafeAreaView style={styles.container}>
@@ -50,12 +49,19 @@ export default function CadastroPasso4() {
           <View style={styles.waitingContainer}>
             <ActivityIndicator size="large" color="#00ff00" />
             <Text style={styles.instructionText}>Documento enviado com sucesso!</Text>
-            <Text style={{ fontSize: 16, color: '#8b8682', textAlign: 'center' }}>
-              Aguarde a aprovação do administrador.
+            <Text style={{ fontSize: 16, color: '#8b8682', textAlign: 'center', marginBottom: 30 }}>
+              O sistema pré-validou sua imagem. Prossiga para a escolha do plano.
             </Text>
           </View>
-          <TouchableOpacity style={styles.nextButton} onPress={() => router.push('/cadastro_passo5')}>
-            <Text style={styles.nextButtonText}>SIMULAR APROVAÇÃO</Text>
+          
+          <TouchableOpacity 
+            style={styles.nextButton} 
+            onPress={() => router.push({
+              pathname: '/cadastro_passo5',
+              params: { ...params, foto_coren: image } // Adiciona a foto na mochila
+            })}
+          >
+            <Text style={styles.nextButtonText}>PROSSEGUIR</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -70,7 +76,6 @@ export default function CadastroPasso4() {
 
         <View style={styles.imageViewer}>
           <View style={styles.placeholderBox}>
-             {/* 3. Se tiver imagem, mostra ela. Se não, mostra o ícone cinza */}
              {image ? (
                <Image source={{ uri: image }} style={styles.previewImage} />
              ) : (
@@ -88,6 +93,10 @@ export default function CadastroPasso4() {
         <TouchableOpacity style={styles.nextButton} onPress={handleSend}>
           <Text style={styles.nextButtonText}>PRÓXIMO</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.back()} style={{marginTop: 20}}>
+          <Text style={{color: '#8b8682'}}>Voltar</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -101,14 +110,14 @@ const styles = StyleSheet.create({
   form: { 
     flex: 1, 
     paddingHorizontal: 30, 
-    alignItems: 'center', 
-    paddingTop: 60 
-  },
+    alignItems: 'center',
+     paddingTop: 60 
+    },
   stepText: { 
-    fontSize: 40, 
-    color: '#00ff00', 
-    marginBottom: 40 
-  },
+    fontSize: 40,
+     color: '#00ff00', 
+     marginBottom: 40 
+    },
   instructionText: { 
     fontSize: 20, 
     textAlign: 'center', 
@@ -118,46 +127,49 @@ const styles = StyleSheet.create({
     width: '100%', 
     backgroundColor: '#8b8682', 
     height: 350, 
-    justifyContent: 'space-between', 
-    marginBottom: 40 
-  },
+    justifyContent: 'space-between',
+     marginBottom: 40 
+    },
   placeholderBox: { 
     flex: 1, 
     justifyContent: 'center', 
     alignItems: 'center' 
   },
   previewImage: { 
-    width: '100%', 
-    height: '100%', 
-    resizeMode: 'cover' 
-  }, // Mostra a foto real
+    width: '100%',
+     height: '100%', 
+     resizeMode: 'cover'
+     },
   mountainIcon: { 
     width: 150, 
     height: 100, 
-    borderWidth: 2, 
-    borderColor: '#333', 
-    borderRadius: 10 
-  },
+    borderWidth: 2,
+     borderColor: '#333',
+      borderRadius: 10 
+    },
   attachButton: { 
     backgroundColor: '#333', 
     height: 60, 
     justifyContent: 'center', 
-    alignItems: 'center' 
-  },
+    alignItems: 'center'
+   },
   attachButtonText: { 
     color: '#fff', 
     fontSize: 22 
   },
   nextButton: { 
     backgroundColor: '#0077c2', 
-    width: 220, 
-    height: 80, 
+    width: 220, height: 80, 
     justifyContent: 'center', 
-    alignItems: 'center' 
-  },
+    alignItems: 'center'
+   },
   nextButtonText: { 
     color: '#000', 
     fontSize: 22, 
-    fontWeight: 'bold' 
-  },
+    fontWeight: 'bold'
+   },
+  waitingContainer: { 
+    alignItems: 'center', 
+    marginVertical: 40 
+  }
 });
