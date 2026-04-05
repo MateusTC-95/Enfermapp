@@ -40,7 +40,7 @@ export default function TelaPagamento() {
       };
 
       // 2. Chamada ao servidor com Headers de navegador para evitar bloqueio
-      const response = await fetch('http://enfermapp.great-site.net/backend/public/index.php', {
+      const response = await fetch('https://enfermapp.great-site.net/backend/public/index.php', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
