@@ -1,42 +1,50 @@
-Aqui está o seu arquivo database.php atualizado com as credenciais do Railway.
-
-Além de trocar os textos, adicionei a variável $port, porque o Railway exige que a porta 3306 esteja explícita na conexão para não dar erro.
-
-PHP
 <?php
-// database.php - A chave da porta atualizada para o Railway
+// database.php - Configuração dinâmica para o Railway
 class Database { 
 
-    // Atributos privados com as novas credenciais do Railway
-    private $host = "mysql.railway.internal"; 
-    private $db_name = "railway"; 
-    private $username = "root"; 
-    private $password = "FImhwncVjpHVKugmgiWFuwPEwYVNquKZ"; 
-    private $port = "3306"; // Porta padrão do MySQL no Railway
+    private $host; 
+    private $db_name; 
+    private $username; 
+    private $password; 
+    private $port; 
     
     public $conn;
 
-    // A função que realmente conecta
+    public function __construct() {
+        // Tentamos pegar das variáveis de ambiente do Railway
+        // Se não existirem, ele usa os valores que você passou como "fallback"
+        $this->host = getenv('MYSQLHOST') ?: "mysql.railway.internal"; 
+        $this->db_name = getenv('MYSQLDATABASE') ?: "railway"; 
+        $this->username = getenv('MYSQLUSER') ?: "root"; 
+        $this->password = getenv('MYSQLPASSWORD') ?: "FImhwncVjpHVKugmgiWFuwPEwYVNquKZ"; 
+        $this->port = getenv('MYSQLPORT') ?: "3306";
+    }
+
     public function getConnection() {
         $this->conn = null; 
 
         try {
-            // No Railway, precisamos incluir a porta (port) dentro da string de conexão (DSN)
+            // String de conexão (DSN) usando as variáveis dinâmicas
+            $connectionString = "mysql:host=" . $this->host . ";port=" . $this->port . ";dbname=" . $this->db_name;
+            
             $this->conn = new PDO(
-                "mysql:host=" . $this->host . ";port=" . $this->port . ";dbname=" . $this->db_name, 
+                $connectionString, 
                 $this->username, 
                 $this->password
             );
 
-            // Configuração para garantir que acentos (ç, ã, é) funcionem perfeitamente
+            // Garante suporte a acentuação
             $this->conn->exec("set names utf8"); 
             
-            // Ativa o modo de erros para facilitar a nossa vida no Debug do TCC
+            // Modo de erro para o Debug do seu TCC
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         } catch(PDOException $exception) {
-            // Se o servidor do Railway cair ou a senha estiver errada, ele avisa aqui
-            echo "Erro de conexão: " . $exception->getMessage(); 
+            // Log do erro para aparecer no "View Logs" do Railway
+            error_log("Erro de conexão no Railway: " . $exception->getMessage()); 
+            // Opcional: não dar echo em produção para não expor estrutura, mas para TCC ajuda:
+            echo json_encode(["erro" => "Falha na conexão com o banco de dados."]);
+            exit;
         }
 
         return $this->conn; 
