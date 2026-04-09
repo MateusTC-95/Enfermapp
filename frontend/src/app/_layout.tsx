@@ -1,66 +1,63 @@
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar'; // Adicione isso para um visual profissional
 
-// Impede que a tela de abertura (Splash) suma rápido demais
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   
   useEffect(() => {
-    // Quando o app carregar, esconde a Splash Screen
     SplashScreen.hideAsync();
   }, []);
 
   return (
-    <Stack 
-      screenOptions={{ 
-        headerShown: true, // Padrão para as telas internas
-        headerTitleStyle: { fontWeight: 'bold' },
-      }}
-    >
-      
-      {/*TELA INICIAL (Boas-vindas com os 2 botões) */}
-      <Stack.Screen 
-        name="index" 
-        options={{ headerShown: false }} 
-      />
+    <>
+      {/* Define o estilo da barra de status do celular (hora, bateria, etc) */}
+      <StatusBar style="dark" /> 
 
-      {/*TELA DE FORMULÁRIO DE LOGIN */}
-      <Stack.Screen 
-        name="login" 
-        options={{ 
-          headerShown: false, // Deixamos falso pra usar o design do prototipo
-          title: 'Entrar' 
-        }} 
-      />
+      <Stack 
+        screenOptions={{ 
+          headerShown: true, 
+          headerTitleStyle: { fontWeight: 'bold' },
+          headerBackTitle: 'Voltar', // Texto no botão de voltar (iOS)
+        }}
+      >
+        
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="cadastro" options={{ headerShown: false }} />
 
-      {/*TELA DE FORMULÁRIO DE CADASTRO */}
-      <Stack.Screen 
-        name="cadastro" 
-        options={{ 
-          headerShown: false, // Deixamos falso para manter o padrão visual
-          title: 'Criar Conta' 
-        }} 
-      />
+        {/* DICA: Se você tiver cadastro_passo2, passo3, etc, 
+          garanta que eles também tenham headerShown: false aqui 
+          ou use um padrão global.
+        */}
+        <Stack.Screen name="cadastro_passo2" options={{ headerShown: false }} />
+        <Stack.Screen name="cadastro_passo3" options={{ headerShown: false }} />
+        <Stack.Screen name="cadastro_passo4" options={{ headerShown: false }} />
+        <Stack.Screen name="cadastro_passo5" options={{ headerShown: false }} />
+        <Stack.Screen name="cadastro_passo6" options={{ headerShown: false }} />
 
-      {/* --- DASHBOARDS (Áreas Restritas) --- */}
-      
-      <Stack.Screen 
-        name="cliente/dashboard" 
-        options={{ title: 'Área do Paciente' }} 
-      />
-      
-      <Stack.Screen 
-        name="profissional/dashboard" 
-        options={{ title: 'Área do Profissional' }} 
-      />
+        {/* --- DASHBOARDS --- */}
+        {/* Se o nome do arquivo for (ex: app/cliente/dashboard.js), 
+           o Expo Router entende o caminho abaixo:
+        */}
+        <Stack.Screen 
+          name="cliente/dashboard" 
+          options={{ title: 'Área do Paciente', headerLeft: () => null }} // headerLeft null impede voltar pro Login
+        />
+        
+        <Stack.Screen 
+          name="profissional/dashboard" 
+          options={{ title: 'Área do Profissional', headerLeft: () => null }} 
+        />
 
-      <Stack.Screen 
-        name="admin/dashboard" 
-        options={{ title: 'Painel Admin' }} 
-      />
+        <Stack.Screen 
+          name="admin/dashboard" 
+          options={{ title: 'Painel Admin', headerLeft: () => null }} 
+        />
 
-    </Stack>
+      </Stack>
+    </>
   );
 }

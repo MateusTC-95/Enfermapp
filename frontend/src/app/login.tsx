@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
-import api from '../services/api';
+// Importamos o supabase que configuramos no seu services/api
+import { supabase } from '../services/api'; 
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -15,24 +16,31 @@ export default function LoginScreen() {
       Alert.alert("Erro", "Por favor, preencha todos os campos.");
       return;
     }
+
     try {
-      // Usamos .toLowerCase() para garantir que o texto combine com as pastas
       const tipoRota = tipo.toLowerCase();
       
-      const response = await api.post('index.php', {
-        tipo: tipoRota,
-        nome_usuario: usuario,
-        senha: senha
-      });
+      // CONSULTA DIRETA AO SUPABASE
+      // Buscamos o usuário onde nome, senha e tipo sejam iguais aos digitados
+      const { data, error } = await supabase
+        .from('usuario')
+        .select('*')
+        .eq('nome_usuario', usuario)
+        .eq('senha', senha)
+        .eq('tipo_conta', tipoRota === 'administrador' ? 'admin' : tipoRota) // Ajuste para bater com o ENUM 'admin'
+        .single(); // Esperamos apenas um resultado
 
-      if (response.data.success) {
-        // O 'as any' evita o erro de rota dinâmica do TypeScript
-        router.replace(`/${tipoRota}/dashboard` as any);
-      } else {
-        Alert.alert("Erro", response.data.message || "Usuário ou senha inválidos");
+      if (error || !data) {
+        Alert.alert("Erro", "Usuário ou senha inválidos.");
+        return;
       }
+
+      // Se chegamos aqui, o login deu certo
+      router.replace(`/${tipoRota}/dashboard` as any);
+
     } catch (error) {
-      Alert.alert("Erro", "Não foi possível conectar ao servidor.");
+      Alert.alert("Erro", "Não foi possível conectar ao banco de dados.");
+      console.error(error);
     }
   };
 
