@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
-// Importamos o supabase que configuramos no seu services/api
 import { supabase } from '../services/api'; 
 
 export default function LoginScreen() {
@@ -10,6 +9,7 @@ export default function LoginScreen() {
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [mostrarSenha, setMostrarSenha] = useState(false); // Novo estado
 
   const handleLogin = async () => {
     if (!tipo || !usuario || !senha) {
@@ -20,22 +20,19 @@ export default function LoginScreen() {
     try {
       const tipoRota = tipo.toLowerCase();
       
-      // CONSULTA DIRETA AO SUPABASE
-      // Buscamos o usuário onde nome, senha e tipo sejam iguais aos digitados
       const { data, error } = await supabase
         .from('usuario')
         .select('*')
         .eq('nome_usuario', usuario)
         .eq('senha', senha)
-        .eq('tipo_conta', tipoRota === 'administrador' ? 'admin' : tipoRota) // Ajuste para bater com o ENUM 'admin'
-        .single(); // Esperamos apenas um resultado
+        .eq('tipo_conta', tipoRota === 'administrador' ? 'admin' : tipoRota)
+        .single();
 
       if (error || !data) {
         Alert.alert("Erro", "Usuário ou senha inválidos.");
         return;
       }
 
-      // Se chegamos aqui, o login deu certo
       router.replace(`/${tipoRota}/dashboard` as any);
 
     } catch (error) {
@@ -79,12 +76,20 @@ export default function LoginScreen() {
         />
 
         <Text style={styles.label}>Senha</Text>
-        <TextInput 
-          style={styles.input} 
-          value={senha} 
-          onChangeText={setSenha} 
-          secureTextEntry 
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput 
+            style={styles.inputSenha} 
+            value={senha} 
+            onChangeText={setSenha} 
+            secureTextEntry={!mostrarSenha} // Alterna entre oculto e visível
+          />
+          <TouchableOpacity 
+            style={styles.eyeButton} 
+            onPress={() => setMostrarSenha(!mostrarSenha)}
+          >
+            <Text style={{ fontSize: 20 }}>{mostrarSenha ? '🔓' : '🔒'}</Text>
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
           <Text style={styles.loginButtonText}>LOGIN</Text>
@@ -116,6 +121,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15, 
     fontSize: 16, 
     color: '#000' 
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#8b8682',
+    height: 60,
+  },
+  inputSenha: {
+    flex: 1,
+    height: 60,
+    paddingHorizontal: 15,
+    fontSize: 16,
+    color: '#000',
+  },
+  eyeButton: {
+    paddingHorizontal: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dropdownHeader: { 
     backgroundColor: '#8b8682', 
