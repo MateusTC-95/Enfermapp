@@ -7,30 +7,24 @@ export default function App() {
     <View style={styles.container}>
       
       <Text style={styles.title}>
-        Bem-Vindo(a) ao painel{'\n'}de profissional
+        Bem-Vindo(a) ao painel{'\n'}de Admin
       </Text>
 
       <Text style={styles.subtitle}>
         Selecione uma das Opções Abaixo:
       </Text>
 
-      {/* Botão Perfil */}
+      {/* Botão Aprovações */}
       <TouchableOpacity style={styles.button}>
-        <Ionicons name="person-outline" size={40} color="black" />
-        <Text style={styles.buttonText}>Perfil</Text>
+        <Text style={styles.buttonText}>Aprovações Pendentes</Text>
       </TouchableOpacity>
 
-      {/* Linha com 2 botões */}
+      {/* Pagamentos Pendentes */}
       <View style={styles.row}>
         <TouchableOpacity style={styles.button}>
-          <Ionicons name="calendar-outline" size={40} color="black" />
-          <Text style={styles.buttonText}>Agenda</Text>
+          <Text style={styles.buttonText}>Pagamentos Pendentes</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.button}>
-          <Ionicons name="notifications-outline" size={40} color="black" />
-          <Text style={styles.buttonText}>Notificações</Text>
-        </TouchableOpacity>
+        
       </View>
 
     </View>

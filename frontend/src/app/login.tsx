@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
+// Importamos o supabase que configuramos no seu services/api
 import { supabase } from '../services/api'; 
 
 export default function LoginScreen() {
@@ -9,23 +10,27 @@ export default function LoginScreen() {
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [mostrarSenha, setMostrarSenha] = useState(false); // Novo estado
+  const [mostrarSenha, setMostrarSenha] = useState(false); // Estado para o cadeado
 
   const handleLogin = async () => {
+    // Validação básica
     if (!tipo || !usuario || !senha) {
       Alert.alert("Erro", "Por favor, preencha todos os campos.");
       return;
     }
 
     try {
-      const tipoRota = tipo.toLowerCase();
+      // 1. Tratamos o tipo para a consulta no banco e para a rota da pasta
+      // Se for 'Administrador', vira 'admin'. Caso contrário, vira 'cliente' ou 'profissional'
+      const tipoNormalizado = tipo.toLowerCase() === 'administrador' ? 'admin' : tipo.toLowerCase();
       
+      // CONSULTA AO SUPABASE
       const { data, error } = await supabase
         .from('usuario')
         .select('*')
         .eq('nome_usuario', usuario)
-        .eq('senha', senha)
-        .eq('tipo_conta', tipoRota === 'administrador' ? 'admin' : tipoRota)
+        .eq('senha', senha) // No futuro, usaremos hash aqui!
+        .eq('tipo_conta', tipoNormalizado)
         .single();
 
       if (error || !data) {
@@ -33,7 +38,9 @@ export default function LoginScreen() {
         return;
       }
 
-      router.replace(`/${tipoRota}/dashboard` as any);
+      // 2. NAVEGAÇÃO
+      // Agora o redirecionamento usa o nome da pasta correto (admin, cliente ou profissional)
+      router.replace(`/${tipoNormalizado}/dashboard` as any);
 
     } catch (error) {
       Alert.alert("Erro", "Não foi possível conectar ao banco de dados.");
@@ -44,6 +51,8 @@ export default function LoginScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.form}>
+        
+        {/* SELETOR DE TIPO DE CONTA */}
         <Text style={styles.label}>Selecione o Tipo de Conta</Text>
         <TouchableOpacity 
           style={styles.dropdownHeader} 
@@ -67,6 +76,7 @@ export default function LoginScreen() {
           </View>
         )}
 
+        {/* NOME DE USUÁRIO */}
         <Text style={styles.label}>Nome de Usuário</Text>
         <TextInput 
           style={styles.input} 
@@ -75,13 +85,14 @@ export default function LoginScreen() {
           autoCapitalize="none" 
         />
 
+        {/* SENHA COM CADEADO (MOSTRAR/OCULTAR) */}
         <Text style={styles.label}>Senha</Text>
         <View style={styles.passwordContainer}>
           <TextInput 
             style={styles.inputSenha} 
             value={senha} 
             onChangeText={setSenha} 
-            secureTextEntry={!mostrarSenha} // Alterna entre oculto e visível
+            secureTextEntry={!mostrarSenha} 
           />
           <TouchableOpacity 
             style={styles.eyeButton} 
@@ -91,6 +102,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* BOTÃO DE LOGIN */}
         <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
           <Text style={styles.loginButtonText}>LOGIN</Text>
         </TouchableOpacity>
@@ -142,7 +154,7 @@ const styles = StyleSheet.create({
   },
   dropdownHeader: { 
     backgroundColor: '#8b8682', 
-    height: 40, 
+    height: 50, // Aumentado para melhor toque
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
@@ -158,10 +170,11 @@ const styles = StyleSheet.create({
   },
   dropdownOptions: { 
     backgroundColor: '#8b8682', 
-    marginTop: 1 
+    marginTop: 1,
+    zIndex: 10, // Garante que fique por cima
   },
   option: { 
-    padding: 10, 
+    padding: 15, 
     borderBottomWidth: 0.5, 
     borderBottomColor: '#7a7571' 
   },
@@ -179,7 +192,7 @@ const styles = StyleSheet.create({
     marginTop: 50 
   },
   loginButtonText: { 
-    color: '#000', 
+    color: '#fff', 
     fontSize: 24, 
     fontWeight: 'bold' 
   },
