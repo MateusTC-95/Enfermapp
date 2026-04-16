@@ -23,7 +23,7 @@ export default function DashboardCliente() {
             style={styles.button} 
             onPress={() => navegar('/cliente/perfil')}
           >
-            <Ionicons name="person" size={30} color="#fff" />
+            <Ionicons name="person" size={30} color="#" />
             <Text style={styles.buttonText}>Perfil</Text>
           </TouchableOpacity>
 
@@ -32,16 +32,17 @@ export default function DashboardCliente() {
             style={styles.button} 
             onPress={() => navegar('/cliente/buscar')}
           >
-            <Ionicons name="search" size={30} color="#fff" />
+            <Ionicons name="search" size={30} color="#" />
             <Text style={styles.buttonText}>Buscar</Text>
           </TouchableOpacity>
-
+           </View>
+           <View style={styles.grid}>
           {/* BOTÃO AGENDA */}
           <TouchableOpacity 
             style={styles.button} 
             onPress={() => navegar('/cliente/agenda')}
           >
-            <Ionicons name="calendar" size={30} color="#fff" />
+            <Ionicons name="calendar" size={30} color="#" />
             <Text style={styles.buttonText}>Agenda</Text>
           </TouchableOpacity>
 
@@ -50,7 +51,7 @@ export default function DashboardCliente() {
             style={styles.button} 
             onPress={() => navegar('/cliente/notificacoes')}
           >
-            <Ionicons name="notifications" size={30} color="#fff" />
+            <Ionicons name="notifications" size={30} color="#" />
             <Text style={styles.buttonText}>Avisos</Text>
           </TouchableOpacity>
         </View>
@@ -83,28 +84,22 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     color: '#333',
   },
-  grid: {
+  grid:{
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    width: '100%',
+    marginTop: 20,
+    width: '100%'
   },
-  button: {
-    backgroundColor: '#4A90E2', // Azul para destacar o clique
-    width: '40%',
-    aspectRatio: 1, // Faz o botão ser um quadrado perfeito
-    margin: 10,
-    borderRadius: 15,
+   button: {
+    width: 120,
+    height: 120,
+    backgroundColor: '#999',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
+    margin: 10,
+    borderRadius: 15,
   },
   buttonText: {
-    color: '#fff',
+    color: '#',
     marginTop: 10,
     fontWeight: 'bold',
     fontSize: 16,

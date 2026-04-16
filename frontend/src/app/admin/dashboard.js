@@ -1,71 +1,82 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { useRouter } from 'expo-router';
 
-export default function App() {
+export default function DashboardAdmin() {
+  const router = useRouter();
+
   return (
-    <View style={styles.container}>
-      
-      <Text style={styles.title}>
-        Bem-Vindo(a) ao painel{'\n'}de Admin
-      </Text>
-
-      <Text style={styles.subtitle}>
-        Selecione uma das Opções Abaixo:
-      </Text>
-
-      {/* Botão Aprovações */}
-      <TouchableOpacity style={styles.button}>
-        <Text style={styles.buttonText}>Aprovações Pendentes</Text>
-      </TouchableOpacity>
-
-      {/* Pagamentos Pendentes */}
-      <View style={styles.row}>
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Pagamentos Pendentes</Text>
-        </TouchableOpacity>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
         
-      </View>
+        <Text style={styles.title}>
+          Bem-Vindo(a) ao painel{'\n'}de administrador
+        </Text>
 
-    </View>
+        <Text style={styles.subtitle}>
+          Selecione uma das Opções Abaixo:
+        </Text>
+
+        {/* Botão Aprovações */}
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={() => router.push('/admin/aprovacoes')} // Ajuste a rota conforme seus arquivos
+        >
+          <Text style={styles.buttonText}>APROVAÇÕES{'\n'}PENDENTES</Text>
+        </TouchableOpacity>
+
+        {/* Botão Intercorrências */}
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={() => router.push('/admin/intercorrencias')} // Ajuste a rota conforme seus arquivos
+        >
+          <Text style={styles.buttonText}>INTERCORRÊNCIAS{'\n'}PENDENTES</Text>
+        </TouchableOpacity>
+
+      </View>
+    </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#e5e5e5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    backgroundColor: '#fff', // Fundo branco como na imagem
   },
-
+  content: {
+    flex: 1,
+    alignItems: 'center',
+    paddingTop: 80, // Espaçamento superior para o título
+    paddingHorizontal: 20,
+  },
   title: {
-    fontSize: 22,
+    fontSize: 28, // Título maior como na imagem
     textAlign: 'center',
     marginBottom: 40,
+    color: '#000',
+    lineHeight: 35,
   },
-
   subtitle: {
-    fontSize: 16,
-    marginBottom: 20,
+    fontSize: 20,
+    textAlign: 'center',
+    marginBottom: 50,
+    color: '#000',
   },
-
-  row: {
-    flexDirection: 'row',
-    marginTop: 20,
-  },
-
   button: {
-    width: 120,
-    height: 120,
-    backgroundColor: '#999',
+    width: '90%', // Botão largo
+    height: 80,   // Altura retangular
+    backgroundColor: '#7a7a7a', // Cinza escuro da imagem
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 10,
+    marginBottom: 30, // Espaço entre os botões
+    // Se quiser o efeito de borda leve:
+    borderRadius: 2, 
   },
-
   buttonText: {
-    marginTop: 8,
-    fontSize: 16,
+    color: '#000', // Texto preto como na imagem
+    fontSize: 20,
+    textAlign: 'center',
+    fontWeight: '400',
+    letterSpacing: 1,
   },
 });
