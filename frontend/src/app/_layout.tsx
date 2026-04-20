@@ -1,7 +1,7 @@
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar'; // Adicione isso para um visual profissional
+import { StatusBar } from 'expo-status-bar';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -13,48 +13,58 @@ export default function RootLayout() {
 
   return (
     <>
-      {/* Define o estilo da barra de status do celular (hora, bateria, etc) */}
       <StatusBar style="dark" /> 
 
       <Stack 
         screenOptions={{ 
-          headerShown: true, 
+          headerShown: false, // Por padrão, deixamos falso e ativamos só nos Dashboards
           headerTitleStyle: { fontWeight: 'bold' },
-          headerBackTitle: 'Voltar', // Texto no botão de voltar (iOS)
+          headerBackTitle: 'Voltar',
         }}
       >
-        
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="cadastro" options={{ headerShown: false }} />
+        {/* --- TELAS DE ACESSO --- */}
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="cadastro" />
+        <Stack.Screen name="cadastro_passo2" />
+        <Stack.Screen name="cadastro_passo3" />
+        <Stack.Screen name="cadastro_passo4" />
+        <Stack.Screen name="cadastro_passo5" />
+        <Stack.Screen name="cadastro_passo6" />
 
-        {/* DICA: Se você tiver cadastro_passo2, passo3, etc, 
-          garanta que eles também tenham headerShown: false aqui 
-          ou use um padrão global.
-        */}
-        <Stack.Screen name="cadastro_passo2" options={{ headerShown: false }} />
-        <Stack.Screen name="cadastro_passo3" options={{ headerShown: false }} />
-        <Stack.Screen name="cadastro_passo4" options={{ headerShown: false }} />
-        <Stack.Screen name="cadastro_passo5" options={{ headerShown: false }} />
-        <Stack.Screen name="cadastro_passo6" options={{ headerShown: false }} />
-
-        {/* --- DASHBOARDS --- */}
-        {/* Se o nome do arquivo for (ex: app/cliente/dashboard.js), 
-           o Expo Router entende o caminho abaixo:
-        */}
+        {/* --- CLIENTE --- */}
         <Stack.Screen 
           name="cliente/dashboard" 
-          options={{ title: 'Área do Paciente', headerLeft: () => null }} // headerLeft null impede voltar pro Login
+          options={{ headerShown: true, title: 'Área do Paciente', headerLeft: () => null }} 
         />
-        
+        <Stack.Screen name="cliente/perfil" options={{ headerShown: false }} />
+        <Stack.Screen 
+          name="cliente/editar_dados" 
+          options={{ 
+            headerShown: true, 
+            title: 'Editar Meus Dados',
+            headerBackTitle: 'Voltar' 
+          }} 
+        />
+        <Stack.Screen name="cliente/buscar" options={{ headerShown: true, title: 'Buscar Serviços' }} />
+        <Stack.Screen name="cliente/agenda" options={{ headerShown: true, title: 'Minha Agenda' }} />
+        <Stack.Screen name="cliente/notificacoes" options={{ headerShown: true, title: 'Notificações' }} />
+
+        {/* --- PROFISSIONAL --- */}
         <Stack.Screen 
           name="profissional/dashboard" 
-          options={{ title: 'Área do Profissional', headerLeft: () => null }} 
+          options={{ headerShown: true, title: 'Área do Profissional', headerLeft: () => null }} 
         />
+        <Stack.Screen name="profissional/perfil" options={{ headerShown: false }} />
 
+        {/* --- ADMIN --- */}
         <Stack.Screen 
           name="admin/dashboard" 
-          options={{ title: 'Painel Admin', headerLeft: () => null }} 
+          options={{ headerShown: true, title: 'Painel Admin', headerLeft: () => null }} 
+        />
+        <Stack.Screen 
+          name="admin/aprovacoes" 
+          options={{ headerShown: false }} // Deixamos false porque você já tem o botão de voltar no código
         />
 
       </Stack>

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
-// Importamos o supabase que configuramos no seu services/api
 import { supabase } from '../services/api'; 
+import AsyncStorage from '@react-native-async-storage/async-storage'; // IMPORTANTE: npx expo install @react-native-async-storage/async-storage
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -10,18 +10,16 @@ export default function LoginScreen() {
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [mostrarSenha, setMostrarSenha] = useState(false); // Estado para o cadeado
+  const [mostrarSenha, setMostrarSenha] = useState(false);
 
   const handleLogin = async () => {
-    // Validação básica
+    // 1. Validação de campos vazios
     if (!tipo || !usuario || !senha) {
-      Alert.alert("Erro", "Por favor, preencha todos os campos.");
+      Alert.alert("Campos Obrigatórios", "Por favor, preencha o tipo de conta, usuário e senha.");
       return;
     }
 
     try {
-      // 1. Tratamos o tipo para a consulta no banco e para a rota da pasta
-      // Se for 'Administrador', vira 'admin'. Caso contrário, vira 'cliente' ou 'profissional'
       const tipoNormalizado = tipo.toLowerCase() === 'administrador' ? 'admin' : tipo.toLowerCase();
       
       // CONSULTA AO SUPABASE
@@ -29,21 +27,29 @@ export default function LoginScreen() {
         .from('usuario')
         .select('*')
         .eq('nome_usuario', usuario)
-        .eq('senha', senha) // No futuro, usaremos hash aqui!
+        .eq('senha', senha)
         .eq('tipo_conta', tipoNormalizado)
         .single();
 
+      // 2. Erro de Usuário ou Senha incorretos
       if (error || !data) {
-        Alert.alert("Erro", "Usuário ou senha inválidos.");
+        Alert.alert(
+          "Acesso Negado", 
+          "Usuário ou senha incorretos para este tipo de conta. Verifique os dados e tente novamente."
+        );
         return;
       }
 
-      // 2. NAVEGAÇÃO
-      // Agora o redirecionamento usa o nome da pasta correto (admin, cliente ou profissional)
+      // 3. SALVAR O NOME PARA O PERFIL (O "pulo do gato")
+      // Isso faz com que a tela perfil.js saiba quem buscar no banco
+      await AsyncStorage.setItem('nome_logado', data.nome_usuario);
+
+      // 4. NAVEGAÇÃO
       router.replace(`/${tipoNormalizado}/dashboard` as any);
 
     } catch (error) {
-      Alert.alert("Erro", "Não foi possível conectar ao banco de dados.");
+      // 5. Erro técnico (falta de internet, banco fora, etc)
+      Alert.alert("Erro de Conexão", "Não foi possível falar com o servidor. Verifique sua internet.");
       console.error(error);
     }
   };
@@ -85,7 +91,7 @@ export default function LoginScreen() {
           autoCapitalize="none" 
         />
 
-        {/* SENHA COM CADEADO (MOSTRAR/OCULTAR) */}
+        {/* SENHA COM CADEADO */}
         <Text style={styles.label}>Senha</Text>
         <View style={styles.passwordContainer}>
           <TextInput 
@@ -112,88 +118,19 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#fff' 
-  },
-  form: { 
-    flex: 1, 
-    paddingHorizontal: 30, 
-    justifyContent: 'center' 
-  },
-  label: { 
-    fontSize: 18, 
-    color: '#000', 
-    marginBottom: 5, 
-    marginTop: 20 
-  },
-  input: { 
-    backgroundColor: '#8b8682', 
-    height: 60, 
-    paddingHorizontal: 15, 
-    fontSize: 16, 
-    color: '#000' 
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#8b8682',
-    height: 60,
-  },
-  inputSenha: {
-    flex: 1,
-    height: 60,
-    paddingHorizontal: 15,
-    fontSize: 16,
-    color: '#000',
-  },
-  eyeButton: {
-    paddingHorizontal: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownHeader: { 
-    backgroundColor: '#8b8682', 
-    height: 50, // Aumentado para melhor toque
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingHorizontal: 15 
-  },
-  inputText: { 
-    fontSize: 16, 
-    color: '#000' 
-  },
-  arrow: { 
-    fontSize: 20, 
-    fontWeight: 'bold' 
-  },
-  dropdownOptions: { 
-    backgroundColor: '#8b8682', 
-    marginTop: 1,
-    zIndex: 10, // Garante que fique por cima
-  },
-  option: { 
-    padding: 15, 
-    borderBottomWidth: 0.5, 
-    borderBottomColor: '#7a7571' 
-  },
-  optionText: { 
-    fontSize: 16, 
-    color: '#000' 
-  },
-  loginButton: { 
-    backgroundColor: '#cc0000', 
-    width: 150, 
-    height: 70, 
-    alignSelf: 'center', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginTop: 50 
-  },
-  loginButtonText: { 
-    color: '#fff', 
-    fontSize: 24, 
-    fontWeight: 'bold' 
-  },
+  container: { flex: 1, backgroundColor: '#fff' },
+  form: { flex: 1, paddingHorizontal: 30, justifyContent: 'center' },
+  label: { fontSize: 18, color: '#000', marginBottom: 5, marginTop: 20 },
+  input: { backgroundColor: '#8b8682', height: 60, paddingHorizontal: 15, fontSize: 16, color: '#000' },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#8b8682', height: 60 },
+  inputSenha: { flex: 1, height: 60, paddingHorizontal: 15, fontSize: 16, color: '#000' },
+  eyeButton: { paddingHorizontal: 15, justifyContent: 'center', alignItems: 'center' },
+  dropdownHeader: { backgroundColor: '#8b8682', height: 50, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15 },
+  inputText: { fontSize: 16, color: '#000' },
+  arrow: { fontSize: 20, fontWeight: 'bold' },
+  dropdownOptions: { backgroundColor: '#8b8682', marginTop: 1, zIndex: 10 },
+  option: { padding: 15, borderBottomWidth: 0.5, borderBottomColor: '#7a7571' },
+  optionText: { fontSize: 16, color: '#000' },
+  loginButton: { backgroundColor: '#cc0000', width: 150, height: 70, alignSelf: 'center', justifyContent: 'center', alignItems: 'center', marginTop: 50 },
+  loginButtonText: { color: '#fff', fontSize: 24, fontWeight: 'bold' },
 });

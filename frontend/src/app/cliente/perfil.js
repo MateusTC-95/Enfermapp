@@ -1,117 +1,214 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image} from 'react-native';
-import {Ionicons} from '@expo/vector-icons';
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import { supabase } from '../../services/api';
+import { decode } from 'base64-arraybuffer'; 
 
-export default function Perfil({ navigation }) { // <-- Precisa ter o "default"
-  return (
+export default function Perfil() {
+  const router = useRouter();
+  const [foto, setFoto] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
   
+  const [dadosUsuario, setDadosUsuario] = useState({
+    nome_usuario: '',
+    cidade: '',
+    telefone: '',
+    pagamento_usado: ''
+  });
+
+  const buscarDados = async () => {
+    try {
+      const nomeSalvo = await AsyncStorage.getItem('nome_logado');
+      if (!nomeSalvo) {
+        router.replace('/login');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('usuario')
+        .select('nome_usuario, cidade, telefone, pagamento_usado, foto_perfil')
+        .eq('nome_usuario', nomeSalvo) 
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setDadosUsuario({
+          nome_usuario: data.nome_usuario,
+          cidade: data.cidade || 'Não informada',
+          telefone: data.telefone || 'Não informado',
+          pagamento_usado: data.pagamento_usado || 'Não informado'
+        });
+        setFoto(data.foto_perfil);
+      }
+    } catch (error) {
+      console.log("Erro ao buscar dados:", error.message);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      buscarDados();
+    }, [])
+  );
+
+  const escolherFoto = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5, 
+      base64: true, 
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      uploadImagem(result.assets[0].base64);
+    }
+  };
+
+  const uploadImagem = async (base64) => {
+    try {
+      setLoading(true);
+      const nomeSalvo = await AsyncStorage.getItem('nome_logado');
+      const fileName = `${Date.now()}-${nomeSalvo}.png`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, decode(base64), { contentType: 'image/png' });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('usuario')
+        .update({ foto_perfil: publicUrl })
+        .eq('nome_usuario', nomeSalvo); 
+
+      if (updateError) throw updateError;
+
+      setFoto(publicUrl);
+      Alert.alert("Sucesso", "Foto de perfil atualizada!");
+    } catch (error) {
+      Alert.alert("Erro", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (fetching) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#808000" />
+      </View>
+    );
+  }
+
+  return (
     <View style={styles.container}>
-    <ScrollView>
-    <View style={styles.row}>
-    <TouchableOpacity style={styles.buttonIcon} onPress={() => navigation.navigate('Foto')}>
-    <Ionicons name="person-outline" size={40} color="grey"/>
-    </TouchableOpacity>
-    <View style={styles.userInfo}>
-    <Text style={styles.name}>Fulana de Tal</Text>
-    <Text style={styles.aviso}>Avisos:</Text>
-    </View>
-    </View>
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Cabeçalho igual ao do profissional */}
+        <View style={styles.headerCard}>
+          <TouchableOpacity 
+            style={styles.buttonIcon} 
+            onPress={escolherFoto}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#808000" />
+            ) : foto ? (
+              <Image source={{ uri: foto }} style={styles.fotoAvatar} />
+            ) : (
+              <Ionicons name="person-outline" size={40} color="grey" />
+            )}
+          </TouchableOpacity>
+          
+          <View style={styles.userInfo}>
+            <Text style={styles.name}>{dadosUsuario.nome_usuario}</Text>
+            <Text style={styles.avisoText}>Cliente Particular</Text>
+          </View>
+        </View>
 
-    <View style={styles.separator} /> 
+        <View style={styles.separator} /> 
 
-    <View style={styles.detailsSection}>
-    <Text style={styles.sectionTitle}>Dados Pessoais</Text>
+        <View style={styles.detailsSection}>
+          <Text style={styles.sectionTitle}>DADOS DO CLIENTE</Text>
 
-    <View style={styles.infoList}>
-    <Text style={styles.texto}>Cidade:</Text>
-    <Text style={styles.texto}>Número de Serviços Recebidos</Text>
-    <Text style={styles.texto}>Avisos:</Text>
-    <Text style={styles.texto}>Telefone:</Text>
-    <Text style={styles.texto}>Pagamento Usado:</Text> 
-    </View> 
-    
+          {/* Lista de informações com ícones */}
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={20} color="black" />
+            <Text style={styles.infoLabel}>Cidade: <Text style={styles.infoValue}>{dadosUsuario.cidade}</Text></Text>
+          </View>
 
-    <TouchableOpacity style={styles.button}>
-    <Text style={styles.buttonText}>Editar Dados</Text>
-    </TouchableOpacity>
-    </View> 
-    </ScrollView>
+          <View style={styles.infoRow}>
+            <Ionicons name="call-outline" size={20} color="black" />
+            <Text style={styles.infoLabel}>Telefone: <Text style={styles.infoValue}>{dadosUsuario.telefone}</Text></Text>
+          </View>
+
+          <View style={styles.infoRow}>
+            <Ionicons name="briefcase-outline" size={20} color="black" />
+            <Text style={styles.infoLabel}>Serviços Recebidos: <Text style={styles.infoValue}>0</Text></Text>
+          </View>
+
+          <View style={styles.subSection}>
+            <Text style={styles.subTitle}>PAGAMENTO PREFERENCIAL</Text>
+            <Text style={styles.infoValueBold}>{dadosUsuario.pagamento_usado.toUpperCase()}</Text>
+          </View>
+
+          <TouchableOpacity 
+            style={styles.button}
+            onPress={() => router.push('/cliente/editar_dados')}
+          >
+            <Text style={styles.buttonText}>EDITAR MEUS DADOS</Text>
+          </TouchableOpacity>
+        </View> 
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-
-  container: {
-    flex: 4,
-    backgroundColor:'#8C8C8C', 
-    paddingBottom: 20,
+  container: { flex: 1, backgroundColor: '#8C8C8C' },
+  center: { flex: 1, backgroundColor: '#8C8C8C', justifyContent: 'center', alignItems: 'center' },
+  headerCard: { flexDirection: 'row', marginTop: 50, paddingHorizontal: 20, alignItems: 'center' },
+  buttonIcon: { 
+    backgroundColor: 'black', 
+    width: 80, 
+    height: 80, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    borderRadius: 40, // Redondo como o do prof
+    overflow: 'hidden', 
+    borderWidth: 2, 
+    borderColor: '#808000' // Verde Oliva
   },
-
-  row: {
-    flexDirection: 'row',
-    marginTop: 20,
+  fotoAvatar: { width: '100%', height: '100%' },
+  userInfo: { marginLeft: 20 },
+  name: { fontSize: 22, fontWeight: 'bold', color: 'black' },
+  avisoText: { fontSize: 14, color: '#333' },
+  separator: { height: 2, backgroundColor: '#000', marginVertical: 20, marginHorizontal: 20 },
+  detailsSection: { paddingHorizontal: 25 },
+  sectionTitle: { fontSize: 20, fontWeight: '900', color: '#000', marginBottom: 20, textAlign: 'center' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  infoLabel: { fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
+  infoValue: { fontWeight: 'normal' },
+  infoValueBold: { fontWeight: 'bold', fontSize: 16, color: 'black' },
+  subSection: { marginTop: 20, marginBottom: 10 },
+  subTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 8, color: '#222' },
+  button: { 
+    backgroundColor: '#808000', // Verde Oliva
+    paddingVertical: 15, 
+    borderRadius: 10, 
+    marginTop: 30, 
+    alignItems: 'center' 
   },
-
-  button: {
-    backgroundColor: '#00FFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    marginBottom: 30,
-  },
-
-  buttonIcon: {
-    backgroundColor: 'black',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    marginLeft: 12,
-  },
-
-  buttonText: {
-    fontSize: 22,
-    color: '#000',
-  },
-
-  name: {
-    fontSize: 20,
-  },
-  aviso: {
-    fontSize: 20,
-  },
-
-  userInfo: {
-    flex: 1,
-    textAlign: 'center',
-    marginLeft: 22,
-  },
-
-  separator: {
-  height: 3,
-  backgroundColor: '#000000', 
-  marginVertical: 10, 
-},
-
- texto: {
-    fontSize: 16,
-    color: '#000',
-    marginBottom: 15,
-  },
-
- infoList: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-
-detailsSection: {
-    flex: 1,
-    alignItems: 'center',
-    paddingTop: 20,
-  },
-
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '400',
-    color: '#000',
-    marginBottom: 20,
-  },
+  buttonText: { fontSize: 18, color: '#fff', fontWeight: 'bold' }, // Texto branco para contrastar com oliva
 });

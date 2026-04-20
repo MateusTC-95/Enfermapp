@@ -18,33 +18,19 @@ export default function VerificacaoProfissionais() {
 
       <View style={styles.content}>
         <Text style={styles.title}>
-          Verificação de Profissionais
+          Lista de Intercorrências
         </Text>
 
         <Text style={styles.subtitle}>
           Selecione uma das Opções Abaixo:
         </Text>
 
-        <View style={styles.row}>
-          {/* Botão Documentos */}
-          <TouchableOpacity 
-            style={styles.squareButton}
-            onPress={() => console.log('Ir para Documentos')}
-          >
-            <Ionicons name="attach-outline" size={80} color="black" />
-            <Text style={styles.buttonText}>Documentos</Text>
-          </TouchableOpacity>
+       
+            
 
-          {/* Botão Pagamento */}
-          <TouchableOpacity 
-            style={styles.squareButton}
-            onPress={() => console.log('Ir para Pagamento')}
-          >
-            <FontAwesome5 name="dollar-sign" size={70} color="black" />
-            <Text style={styles.buttonText}>Pagamento</Text>
-          </TouchableOpacity>
+        
+           
         </View>
-      </View>
     </SafeAreaView>
   );
 }

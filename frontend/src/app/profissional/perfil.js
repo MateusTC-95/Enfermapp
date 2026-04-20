@@ -1,162 +1,151 @@
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import { supabase } from '../../services/api';
 
-export default function Perfil({navigation}) {
+export default function PerfilProfissional() {
+  const router = useRouter();
+  const [foto, setFoto] = useState(null);
+  const [fetching, setFetching] = useState(true);
+  
+  const [dados, setDados] = useState({
+    nome_usuario: '',
+    cidade: '',
+    telefone: '',
+    pagamentos: [],
+    descricao: '',
+    avaliacao_media: 0,
+    horario: '',
+  });
+
+  const buscarDados = async () => {
+    try {
+      setFetching(true);
+      const nomeSalvo = await AsyncStorage.getItem('nome_logado');
+      if (!nomeSalvo) { router.replace('/login'); return; }
+
+      // Busca profissional e dados básicos do usuário
+      const { data: prof, error: profError } = await supabase
+        .from('profissional')
+        .select(`
+          id_profissional, 
+          descricao, 
+          avaliacao_media, 
+          usuario!inner (id_usuario, nome_usuario, cidade, telefone, foto_perfil)
+        `)
+        .eq('usuario.nome_usuario', nomeSalvo)
+        .maybeSingle();
+
+      if (profError) throw profError;
+
+      if (prof) {
+        const idP = prof.id_profissional;
+
+        // Busca horários e pagamentos
+        const [resH, resP] = await Promise.all([
+          supabase.from('horarios_profissional').select('*').eq('id_profissional', idP).maybeSingle(),
+          supabase.from('pagamentos_profissional').select('metodo').eq('id_profissional', idP)
+        ]);
+
+        setDados({
+          nome_usuario: prof.usuario?.nome_usuario || 'Não informado',
+          cidade: prof.usuario?.cidade || 'Não informada',
+          telefone: prof.usuario?.telefone || 'Não informado',
+          pagamentos: resP.data ? resP.data.map(item => item.metodo) : [],
+          descricao: prof.descricao || 'Nenhuma descrição informada.',
+          avaliacao_media: prof.avaliacao_media || 0,
+          horario: resH.data?.tipo_horario === 'sem_horario_fixo' 
+            ? 'Atendimento 24h' 
+            : (resH.data?.horario_inicio ? `${resH.data.horario_inicio.slice(0,5)} - ${resH.data.horario_fim.slice(0,5)}` : 'Horário não definido'),
+        });
+        
+        if (prof.usuario?.foto_perfil) setFoto(prof.usuario.foto_perfil);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar perfil:", error.message);
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  useFocusEffect(useCallback(() => { buscarDados(); }, []));
+
+  if (fetching) return <View style={styles.center}><ActivityIndicator size="large" color="#00FFFF" /></View>;
+
   return (
     <View style={styles.container}>
-    <ScrollView>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Perfil do Profissional</Text>
-      </View>
-
-      {/* Informações do Profissional */}
-      <View style={styles.profileInfo}>
-        <View style={styles.avatarContainer}>
-          <Image 
-            source={{ uri: 'https://via.placeholder.com/100' }} 
-            style={styles.avatar} 
-          />
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Cabeçalho */}
+        <View style={styles.headerCard}>
+          <View style={styles.buttonIcon}>
+             {foto ? <Image source={{ uri: foto }} style={styles.fotoAvatar} /> : <Ionicons name="person-outline" size={40} color="grey" />}
+          </View>
+          <View style={styles.userInfo}>
+            <Text style={styles.name}>{dados.nome_usuario}</Text>
+            <Text style={styles.avisoText}>⭐ {dados.avaliacao_media} (Avaliação)</Text>
+          </View>
         </View>
 
-        <View style={styles.userInfo}>
-          <Text style={styles.name}>Pessoa da Silva</Text>
-          <Text style={styles.aviso}>Avisos: 0</Text>
-        </View>
-      </View>
+        <View style={styles.separator} /> 
 
-      {/* Avaliações */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Avaliações do Perfil</Text>
-        <View style={styles.stars}>
-          {[...Array(5)].map((_, i) => (
-            <Ionicons key={i} name="star-outline" size={28} color="#FFD700" />
-          ))}
-        </View>
-        <Text style={styles.evaluationText}>Número de Avaliações: 0</Text>
-        <Text style={styles.evaluationText}>Média de Nota Atual: 0</Text>
-      </View>
+        <View style={styles.detailsSection}>
+          <Text style={styles.sectionTitle}>DADOS DO PERFIL</Text>
 
-      {/* Serviços Prestados */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Tipo de Serviços Prestados</Text>
-        <View style={styles.list}>
-          <Text style={styles.listItem}>• Curativo Simples</Text>
-          <Text style={styles.listItem}>• Curativo Complexo</Text>
-          <Text style={styles.listItem}>• Troca de Bolsas Coletoras</Text>
-          <Text style={styles.listItem}>• Coleta de Material para Exames</Text>
-        </View>
-      </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="location-outline" size={20} color="black" />
+            <Text style={styles.infoLabel}>Cidade: <Text style={styles.infoValue}>{dados.cidade}</Text></Text>
+          </View>
 
-      {/* Pagamentos Aceitos */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Tipos de Pagamentos Aceitos</Text>
-        <View style={styles.list}>
-          <Text style={styles.listItem}>• Pix</Text>
-          <Text style={styles.listItem}>• Dinheiro</Text>
-        </View>
-      </View>
+          <View style={styles.infoRow}>
+            <Ionicons name="call-outline" size={20} color="black" />
+            <Text style={styles.infoLabel}>WhatsApp: <Text style={styles.infoValue}>{dados.telefone}</Text></Text>
+          </View>
 
-       <TouchableOpacity
-          style={styles.button}
-          onPress={() => navigation.navigate('EditFoto')}
-        >
-          <Text style={styles.buttonText}>Editar o seu perfil Proifissional</Text>
-        </TouchableOpacity>
+          <View style={styles.infoRow}>
+            <Ionicons name="time-outline" size={20} color="black" />
+            <Text style={styles.infoLabel}>Horário: <Text style={styles.infoValue}>{dados.horario}</Text></Text>
+          </View>
+
+          <View style={styles.subSection}>
+            <Text style={styles.subTitle}>FORMAS DE PAGAMENTO</Text>
+            <Text style={styles.infoValueBold}>{dados.pagamentos.join(' • ') || 'Não informado'}</Text>
+          </View>
+
+          <View style={styles.subSection}>
+            <Text style={styles.subTitle}>DESCRIÇÃO</Text>
+            <Text style={styles.descricaoText}>{dados.descricao}</Text>
+          </View>
+
+          <TouchableOpacity style={styles.button} onPress={() => router.push('/profissional/editar_dados')}>
+            <Text style={styles.buttonText}>EDITAR DADOS</Text>
+          </TouchableOpacity>
+        </View> 
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#2C2C2C',
-  },
-  buttonText: {
-    marginTop: 8,
-    fontSize: 19,
-    color: "#F7F7F7"
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#555',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  profileInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#3A3A3A',
-    marginBottom: 8,
-  },
-  avatarContainer: {
-    marginRight: 15,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: '#555',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  name: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  aviso: {
-    fontSize: 16,
-    color: '#CCC',
-    marginTop: 4,
-  },
-  section: {
-    backgroundColor: '#3A3A3A',
-    marginBottom: 8,
-    padding: 15,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 10,
-  },
-  stars: {
-    flexDirection: 'row',
-    marginBottom: 12,
-  },
-  evaluationText: {
-    fontSize: 15,
-    color: '#DDD',
-    marginBottom: 4,
-  },
-  list: {
-    paddingLeft: 5,
-  },
-  listItem: {
-    fontSize: 15,
-    color: '#EEE',
-    marginBottom: 6,
-  },
-    button: {
-    width: 275,
-    height: 75,
-    backgroundColor: '#555',
-    justifyContent: 'center',
-    alignItems: 'center',
-    margin: 15,
-    borderRadius: 15,
-  },
+  container: { flex: 1, backgroundColor: '#8C8C8C' },
+  center: { flex: 1, backgroundColor: '#8C8C8C', justifyContent: 'center', alignItems: 'center' },
+  headerCard: { flexDirection: 'row', marginTop: 50, paddingHorizontal: 20, alignItems: 'center' },
+  buttonIcon: { backgroundColor: 'black', width: 80, height: 80, justifyContent: 'center', alignItems: 'center', borderRadius: 40, overflow: 'hidden', borderWidth: 2, borderColor: '#00FFFF' },
+  fotoAvatar: { width: '100%', height: '100%' },
+  userInfo: { marginLeft: 20 },
+  name: { fontSize: 22, fontWeight: 'bold', color: 'black' },
+  avisoText: { fontSize: 14, color: '#333' },
+  separator: { height: 2, backgroundColor: '#000', marginVertical: 20, marginHorizontal: 20 },
+  detailsSection: { paddingHorizontal: 25 },
+  sectionTitle: { fontSize: 20, fontWeight: '900', color: '#000', marginBottom: 20, textAlign: 'center' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  infoLabel: { fontSize: 16, fontWeight: 'bold', marginLeft: 10 },
+  infoValue: { fontWeight: 'normal' },
+  infoValueBold: { fontWeight: 'bold', fontSize: 16, color: 'black' },
+  subSection: { marginTop: 20, marginBottom: 10 },
+  subTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 8, color: '#222' },
+  descricaoText: { fontSize: 16, color: '#1a1a1a', fontStyle: 'italic', lineHeight: 22 },
+  button: { backgroundColor: '#00FFFF', paddingVertical: 15, borderRadius: 10, marginTop: 30, alignItems: 'center' },
+  buttonText: { fontSize: 18, color: '#000', fontWeight: 'bold' },
 });
