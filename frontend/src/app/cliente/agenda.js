@@ -5,12 +5,6 @@ export default function Agenda() { // <-- Precisa ter o "default"
   return (
   <View style={styles.container}>
 
-  <TouchableOpacity style={styles.button}>
-
-  <Text style={styles.buttontext}>Procedimento 1</Text>
-
-  </TouchableOpacity>   
-
   </View>
   );
 }
