@@ -23,7 +23,7 @@ export default function Notificacoes() {
         .single();
 
       if (prof) {
-        // 2. Buscar agendamentos (Pendentes e Confirmados)
+        // 2. Buscar agendamentos (Pendentes, Confirmados e Rejeitados)
         const { data, error } = await supabase
           .from('agendamentos')
           .select(`
@@ -53,13 +53,13 @@ export default function Notificacoes() {
   );
 
   const renderItem = ({ item }) => {
-    // Se for PENDENTE, mostra o card de "Nova Solicitação" (Igual sua imagem 60a7c2)
+    // SE FOR PENDENTE
     if (item.status === 'pendente') {
       return (
         <TouchableOpacity 
           style={styles.cardAviso}
           onPress={() => router.push({
-            pathname: '/profissional/detalhes_solicitacao', // Tela que vamos criar/ajustar
+            pathname: '/profissional/detalhes_solicitacao',
             params: { idAgendamento: item.id_agendamento }
           })}
         >
@@ -70,7 +70,19 @@ export default function Notificacoes() {
       );
     }
 
-    // Se for CONFIRMADO, mostra o card cinza simples (Igual sua imagem 60a7df)
+    // SE FOR REJEITADO (A mudança que você pediu está aqui)
+    if (item.status === 'rejeitado' || item.status === 'cancelado') {
+      return (
+        <View style={[styles.cardInformativo, { borderLeftWidth: 5, borderLeftColor: 'red' }]}>
+          <Text style={[styles.cardTitle, { color: '#600' }]}>Atendimento Recusado</Text>
+          <Text style={styles.cardSub}>
+            Você recusou a solicitação de {item.usuario?.nome_usuario} para {item.servico?.nome_servico}.
+          </Text>
+        </View>
+      );
+    }
+
+    // SE FOR CONFIRMADO (Ou qualquer outro status positivo)
     return (
       <View style={styles.cardInformativo}>
         <Text style={styles.cardTitle}>Atendimento Confirmado</Text>
@@ -117,8 +129,6 @@ const styles = StyleSheet.create({
     paddingBottom: 10 
   },
   headerTitle: { fontSize: 20, fontWeight: 'bold', marginLeft: 10 },
-  
-  // Estilo do card clicável (Nova Solicitação)
   cardAviso: { 
     backgroundColor: '#D9D9D9', 
     padding: 20, 
@@ -127,8 +137,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 4,
     borderBottomColor: '#777' 
   },
-  
-  // Estilo do card informativo (Confirmado)
   cardInformativo: { 
     backgroundColor: '#D9D9D9', 
     padding: 15, 
@@ -136,7 +144,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     opacity: 0.8 
   },
-
   cardTitle: { fontSize: 18, fontWeight: 'bold', textAlign: 'center', marginBottom: 10 },
   cardSub: { fontSize: 16, textAlign: 'center', color: '#333' },
   link: { fontSize: 16, textAlign: 'center', marginTop: 15, fontWeight: 'bold', textDecorationLine: 'underline' },

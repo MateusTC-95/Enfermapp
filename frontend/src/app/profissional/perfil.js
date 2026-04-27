@@ -4,11 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
 import { supabase } from '../../services/api';
+import * as ImagePicker from 'expo-image-picker';
+import { decode } from 'base64-arraybuffer';
 
 export default function PerfilProfissional() {
   const router = useRouter();
   const [foto, setFoto] = useState(null);
   const [fetching, setFetching] = useState(true);
+  const [loading, setLoading] = useState(false); 
   
   const [dados, setDados] = useState({
     nome_usuario: '',
@@ -16,7 +19,8 @@ export default function PerfilProfissional() {
     telefone: '',
     pagamentos: [],
     descricao: '',
-    avaliacao_media: 0,
+    media_avaliacao: 0,
+    total_avaliacoes: 0,
     horario: '',
   });
 
@@ -26,13 +30,14 @@ export default function PerfilProfissional() {
       const nomeSalvo = await AsyncStorage.getItem('nome_logado');
       if (!nomeSalvo) { router.replace('/login'); return; }
 
-      // Busca profissional e dados básicos do usuário
+      // Ajustado para os nomes de colunas corretos: media_avaliacao e total_avaliacoes
       const { data: prof, error: profError } = await supabase
         .from('profissional')
         .select(`
           id_profissional, 
           descricao, 
-          avaliacao_media, 
+          media_avaliacao, 
+          total_avaliacoes,
           usuario!inner (id_usuario, nome_usuario, cidade, telefone, foto_perfil)
         `)
         .eq('usuario.nome_usuario', nomeSalvo)
@@ -43,7 +48,6 @@ export default function PerfilProfissional() {
       if (prof) {
         const idP = prof.id_profissional;
 
-        // Busca horários e pagamentos
         const [resH, resP] = await Promise.all([
           supabase.from('horarios_profissional').select('*').eq('id_profissional', idP).maybeSingle(),
           supabase.from('pagamentos_profissional').select('metodo').eq('id_profissional', idP)
@@ -55,7 +59,8 @@ export default function PerfilProfissional() {
           telefone: prof.usuario?.telefone || 'Não informado',
           pagamentos: resP.data ? resP.data.map(item => item.metodo) : [],
           descricao: prof.descricao || 'Nenhuma descrição informada.',
-          avaliacao_media: prof.avaliacao_media || 0,
+          media_avaliacao: prof.media_avaliacao || 0,
+          total_avaliacoes: prof.total_avaliacoes || 0,
           horario: resH.data?.tipo_horario === 'sem_horario_fixo' 
             ? 'Atendimento 24h' 
             : (resH.data?.horario_inicio ? `${resH.data.horario_inicio.slice(0,5)} - ${resH.data.horario_fim.slice(0,5)}` : 'Horário não definido'),
@@ -70,6 +75,58 @@ export default function PerfilProfissional() {
     }
   };
 
+  const escolherFoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert("Permissão", "Precisamos de acesso às suas fotos.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+      base64: true,
+    });
+
+    if (!result.canceled && result.assets[0].base64) {
+      uploadImagem(result.assets[0].base64);
+    }
+  };
+
+  const uploadImagem = async (base64) => {
+    try {
+      setLoading(true);
+      const nomeSalvo = await AsyncStorage.getItem('nome_logado');
+      const fileName = `${nomeSalvo}-${Date.now()}.png`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, decode(base64), { contentType: 'image/png' });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const { error: updateError } = await supabase
+        .from('usuario')
+        .update({ foto_perfil: publicUrl })
+        .eq('nome_usuario', nomeSalvo);
+
+      if (updateError) throw updateError;
+
+      setFoto(publicUrl);
+      Alert.alert("Sucesso", "Foto de perfil atualizada!");
+    } catch (error) {
+      Alert.alert("Erro", error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useFocusEffect(useCallback(() => { buscarDados(); }, []));
 
   if (fetching) return <View style={styles.center}><ActivityIndicator size="large" color="#00FFFF" /></View>;
@@ -77,14 +134,27 @@ export default function PerfilProfissional() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Cabeçalho */}
+        
         <View style={styles.headerCard}>
-          <View style={styles.buttonIcon}>
-             {foto ? <Image source={{ uri: foto }} style={styles.fotoAvatar} /> : <Ionicons name="person-outline" size={40} color="grey" />}
-          </View>
+          <TouchableOpacity 
+            style={styles.buttonIcon} 
+            onPress={escolherFoto} 
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#00FFFF" />
+            ) : foto ? (
+              <Image source={{ uri: foto }} style={styles.fotoAvatar} />
+            ) : (
+              <Ionicons name="person-outline" size={40} color="grey" />
+            )}
+          </TouchableOpacity>
           <View style={styles.userInfo}>
             <Text style={styles.name}>{dados.nome_usuario}</Text>
-            <Text style={styles.avisoText}>⭐ {dados.avaliacao_media} (Avaliação)</Text>
+            {/* Exibe a média formatada e o total de avaliações */}
+            <Text style={styles.avisoText}>
+              ⭐ {Number(dados.media_avaliacao).toFixed(1)} ({dados.total_avaliacoes} avaliações)
+            </Text>
           </View>
         </View>
 
@@ -135,7 +205,7 @@ const styles = StyleSheet.create({
   fotoAvatar: { width: '100%', height: '100%' },
   userInfo: { marginLeft: 20 },
   name: { fontSize: 22, fontWeight: 'bold', color: 'black' },
-  avisoText: { fontSize: 14, color: '#333' },
+  avisoText: { fontSize: 14, color: '#333', fontWeight: 'bold' },
   separator: { height: 2, backgroundColor: '#000', marginVertical: 20, marginHorizontal: 20 },
   detailsSection: { paddingHorizontal: 25 },
   sectionTitle: { fontSize: 20, fontWeight: '900', color: '#000', marginBottom: 20, textAlign: 'center' },

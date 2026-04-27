@@ -40,7 +40,7 @@ export default function DashboardCliente() {
         </View>
 
         <TouchableOpacity style={styles.btnSair} onPress={() => router.replace('/login')}>
-          <Text style={{color: 'red', fontWeight: 'bold'}}>Sair do App</Text>
+          <Text style={{color: 'red', fontWeight: 'bold'}}>Sair da Conta</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

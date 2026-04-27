@@ -70,7 +70,7 @@ export default function PerfilVendedor() {
                 key={star} 
                 name={star <= Math.round(profissional?.avaliacao_media || 0) ? "star" : "star-outline"} 
                 size={24} 
-                color="#FFD700" 
+                color="#fd6601" 
               />
             ))}
             <Text style={styles.ratingText}>({profissional?.avaliacao_media || '0.0'})</Text>

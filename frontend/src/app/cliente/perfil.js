@@ -17,20 +17,23 @@ export default function Perfil() {
     nome_usuario: '',
     cidade: '',
     telefone: '',
-    pagamento_usado: ''
+    pagamento_usado: '',
+    servicos_recebidos: 0 // Adicionado ao estado
   });
 
   const buscarDados = async () => {
     try {
+      setFetching(true);
       const nomeSalvo = await AsyncStorage.getItem('nome_logado');
       if (!nomeSalvo) {
         router.replace('/login');
         return;
       }
 
+      // Adicionado 'servicos_recebidos' no select
       const { data, error } = await supabase
         .from('usuario')
-        .select('nome_usuario, cidade, telefone, pagamento_usado, foto_perfil')
+        .select('nome_usuario, cidade, telefone, pagamento_usado, foto_perfil, servicos_recebidos')
         .eq('nome_usuario', nomeSalvo) 
         .single();
 
@@ -41,7 +44,8 @@ export default function Perfil() {
           nome_usuario: data.nome_usuario,
           cidade: data.cidade || 'Não informada',
           telefone: data.telefone || 'Não informado',
-          pagamento_usado: data.pagamento_usado || 'Não informado'
+          pagamento_usado: data.pagamento_usado || 'Não informado',
+          servicos_recebidos: data.servicos_recebidos || 0 // Mapeando o valor do banco
         });
         setFoto(data.foto_perfil);
       }
@@ -115,7 +119,6 @@ export default function Perfil() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Cabeçalho igual ao do profissional */}
         <View style={styles.headerCard}>
           <TouchableOpacity 
             style={styles.buttonIcon} 
@@ -142,7 +145,6 @@ export default function Perfil() {
         <View style={styles.detailsSection}>
           <Text style={styles.sectionTitle}>DADOS DO CLIENTE</Text>
 
-          {/* Lista de informações com ícones */}
           <View style={styles.infoRow}>
             <Ionicons name="location-outline" size={20} color="black" />
             <Text style={styles.infoLabel}>Cidade: <Text style={styles.infoValue}>{dadosUsuario.cidade}</Text></Text>
@@ -155,7 +157,8 @@ export default function Perfil() {
 
           <View style={styles.infoRow}>
             <Ionicons name="briefcase-outline" size={20} color="black" />
-            <Text style={styles.infoLabel}>Serviços Recebidos: <Text style={styles.infoValue}>0</Text></Text>
+            {/* Agora exibe o valor real vindo do banco de dados */}
+            <Text style={styles.infoLabel}>Serviços Recebidos: <Text style={styles.infoValue}>{dadosUsuario.servicos_recebidos}</Text></Text>
           </View>
 
           <View style={styles.subSection}>
@@ -185,10 +188,10 @@ const styles = StyleSheet.create({
     height: 80, 
     justifyContent: 'center', 
     alignItems: 'center', 
-    borderRadius: 40, // Redondo como o do prof
+    borderRadius: 40, 
     overflow: 'hidden', 
     borderWidth: 2, 
-    borderColor: '#808000' // Verde Oliva
+    borderColor: '#808000' 
   },
   fotoAvatar: { width: '100%', height: '100%' },
   userInfo: { marginLeft: 20 },
@@ -204,11 +207,11 @@ const styles = StyleSheet.create({
   subSection: { marginTop: 20, marginBottom: 10 },
   subTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 8, color: '#222' },
   button: { 
-    backgroundColor: '#808000', // Verde Oliva
+    backgroundColor: '#808000', 
     paddingVertical: 15, 
     borderRadius: 10, 
     marginTop: 30, 
     alignItems: 'center' 
   },
-  buttonText: { fontSize: 18, color: '#fff', fontWeight: 'bold' }, // Texto branco para contrastar com oliva
+  buttonText: { fontSize: 18, color: '#fff', fontWeight: 'bold' },
 });

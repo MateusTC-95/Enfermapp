@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   fullButton: {
     width: 260,
     height: 120,
-    backgroundColor: '#fff',
+    backgroundColor: '#929292',
     justifyContent: 'center',
     alignItems: 'center',
     margin: 10,
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   button: {
     width: 120,
     height: 120,
-    backgroundColor: '#fff',
+    backgroundColor: '#929292',
     justifyContent: 'center',
     alignItems: 'center',
     margin: 10,

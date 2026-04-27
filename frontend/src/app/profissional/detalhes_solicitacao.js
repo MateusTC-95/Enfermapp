@@ -45,18 +45,26 @@ export default function DetalhesSolicitacao() {
 
       if (error) throw error;
 
-      // LOGICA DE MENSAGEM CORRIGIDA
       const aprovou = novoStatus === 'confirmado';
       const acaoPalavra = aprovou ? 'ACEITOU' : 'RECUSOU';
-      const tituloAlerta = aprovou ? "Solicitação Confirmada" : "Solicitação Negada";
+      const tituloAlerta = aprovou ? "Sucesso!" : "Solicitação Negada";
       
       const msg = `Você ${acaoPalavra} o atendimento de ${agendamento?.usuario?.nome_usuario || 'Cliente'}.`;
 
+      // Ao clicar em OK no alerta, ele redireciona para as notificações
       Alert.alert(
         tituloAlerta, 
         msg,
-        [{ text: "OK", onPress: () => router.replace('/profissional/notificacoes') }]
+        [{ 
+          text: "OK", 
+          onPress: () => {
+            // Usamos replace para garantir que ele saia da pilha de "detalhes" 
+            // e volte para a lista atualizada
+            router.replace('/profissional/notificacoes'); 
+          } 
+        }]
       );
+
     } catch (error) {
       Alert.alert("Erro", "Falha ao atualizar status.");
     }
@@ -66,7 +74,6 @@ export default function DetalhesSolicitacao() {
 
   return (
     <View style={styles.container}>
-      {/* Cabeçalho */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="close-outline" size={40} color="red" />
@@ -75,7 +82,6 @@ export default function DetalhesSolicitacao() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Informações Principais */}
         <View style={styles.infoBox}>
           <Text style={styles.textoInfo}>Agendado Por: <Text style={styles.bold}>{agendamento?.usuario?.nome_usuario}</Text></Text>
           <Text style={styles.textoInfo}>Serviço: <Text style={styles.bold}>{agendamento?.servico?.nome_servico}</Text></Text>
@@ -84,7 +90,6 @@ export default function DetalhesSolicitacao() {
           <Text style={styles.textoInfo}>Tipo de Pagamento: <Text style={styles.bold}>{agendamento?.metodo_pagamento}</Text></Text>
         </View>
 
-        {/* Descrição / Observação */}
         <View style={styles.descBox}>
           <Text style={styles.label}>• Descrição do Procedimento</Text>
           <View style={styles.whiteCard}>
@@ -92,7 +97,7 @@ export default function DetalhesSolicitacao() {
           </View>
         </View>
 
-        {/* Botão Aceitar (Verde) */}
+        {/* Botão Aceitar */}
         <TouchableOpacity 
           activeOpacity={0.8}
           style={[styles.btnAcao, { backgroundColor: '#00FF00' }]} 
@@ -101,7 +106,7 @@ export default function DetalhesSolicitacao() {
           <Text style={styles.btnText}>Aceitar Atendimento</Text>
         </TouchableOpacity>
 
-        {/* Botão Recusar (Vermelho) */}
+        {/* Botão Recusar */}
         <TouchableOpacity 
           activeOpacity={0.8}
           style={[styles.btnAcao, { backgroundColor: '#FF0000', marginTop: 20 }]} 

@@ -18,6 +18,21 @@ export default function AgendarServico() {
     pagamento: 'Dinheiro' // Valor padrão inicial
   });
 
+  // Função para aplicar máscara de horário (HH:MM)
+  const formatarHora = (text) => {
+    // Remove tudo que não for número
+    const nums = text.replace(/[^\d]/g, '');
+    
+    let formatted = nums;
+    if (nums.length > 2) {
+      // Insere os dois pontos após o segundo dígito
+      formatted = `${nums.slice(0, 2)}:${nums.slice(2, 4)}`;
+    }
+    
+    // Limita a 5 caracteres (00:00)
+    setForm({ ...form, hora: formatted.slice(0, 5) });
+  };
+
   const finalizarAgendamento = async () => {
     setLoading(true);
     try {
@@ -55,7 +70,13 @@ export default function AgendarServico() {
         </View>
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.label}>Horário Desejado</Text>
-          <TextInput style={styles.input} placeholder="Ex: 14:30" value={form.hora} onChangeText={(t) => setForm({...form, hora: t})}/>
+          <TextInput 
+            style={styles.input} 
+            placeholder="Ex: 14:30" 
+            keyboardType="numeric" // Abre o teclado numérico
+            value={form.hora} 
+            onChangeText={formatarHora} // Chama a função da máscara
+          />
           
           <Text style={styles.label}>O que você precisa?</Text>
           <TextInput style={[styles.input, { height: 80 }]} multiline placeholder="Descrição..." value={form.descricao} onChangeText={(t) => setForm({...form, descricao: t})}/>
@@ -82,6 +103,7 @@ export default function AgendarServico() {
             style={[styles.mainButton, { marginTop: 30 }]} 
             onPress={() => {
               if(!form.hora || !form.endereco) return Alert.alert("Aviso", "Preencha horário e endereço!");
+              if(form.hora.length < 5) return Alert.alert("Aviso", "Horário incompleto!");
               setPasso(2);
             }}
           >
@@ -143,7 +165,6 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, fontWeight: 'bold', marginBottom: 8, marginTop: 15 },
   input: { backgroundColor: '#FFF', padding: 12, borderRadius: 5, fontSize: 16, color: '#000' },
   
-  // Estilos do Pagamento (Radio Buttons)
   pagamentoContainer: { backgroundColor: '#D9D9D9', borderRadius: 5, padding: 10, marginTop: 5 },
   radioOption: { flexDirection: 'row', alignItems: 'center', marginVertical: 8 },
   radioCircle: { height: 22, width: 22, borderRadius: 11, borderWidth: 2, borderColor: '#000', marginRight: 10, justifyContent: 'center', alignItems: 'center' },
