@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Image, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -11,7 +11,35 @@ export default function CadastroPasso4() {
   const [image, setImage] = useState(null);
   const [isWaiting, setIsWaiting] = useState(false);
   const [isUploading, setIsUploading] = useState(false); 
-  const [urlFinal, setUrlFinal] = useState(null); 
+  const [urlFinal, setUrlFinal] = useState(null);
+  const [documentoAprovado, setDocumentoAprovado] = useState(false); // Novo estado para Realtime
+
+  // --- ESCUTAR APROVAÇÃO EM TEMPO REAL ---
+  useEffect(() => {
+    if (isWaiting && params.id_profissional) {
+      const subscription = supabase
+        .channel('check_aprovacao')
+        .on(
+          'postgres_changes',
+          { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'profissional', 
+            filter: `id_profissional=eq.${params.id_profissional}` 
+          },
+          (payload) => {
+            if (payload.new.status_coren === 'aprovado') {
+              setDocumentoAprovado(true);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    }
+  }, [isWaiting]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -42,7 +70,6 @@ export default function CadastroPasso4() {
     try {
       setIsUploading(true);
 
-      // --- USANDO ARRAYBUFFER PARA ESTABILIDADE ---
       const uri = image;
       const response = await fetch(uri);
       const arrayBuffer = await response.arrayBuffer();
@@ -64,8 +91,16 @@ export default function CadastroPasso4() {
         .from('documentos_profissionais')
         .getPublicUrl(fileName);
 
-      setUrlFinal(publicData.publicUrl);
-      setIsWaiting(true); // Ativa a tela de confirmação de sucesso
+      const url = publicData.publicUrl;
+      setUrlFinal(url);
+
+      // Atualiza a tabela profissional com a URL e status pendente
+      await supabase
+        .from('profissional')
+        .update({ url_coren: url, status_coren: 'pendente' })
+        .eq('id_profissional', params.id_profissional);
+
+      setIsWaiting(true); // Ativa a tela de espera
 
     } catch (error) {
       console.error("ERRO DETALHADO:", error);
@@ -75,29 +110,41 @@ export default function CadastroPasso4() {
     }
   };
 
-  // --- TELA DE ESPERA / SUCESSO (Aparece após o upload) ---
+  // --- TELA DE ESPERA (Aparece após o envio, aguardando Admin) ---
   if (isWaiting) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.form}>
           <Text style={styles.stepText}>Passo 4/5</Text>
           <View style={styles.waitingContainer}>
-            <Text style={{ fontSize: 60, marginBottom: 20 }}>✅</Text>
-            <Text style={styles.instructionText}>Documento Validado!</Text>
-            <Text style={{ fontSize: 16, color: '#8b8682', textAlign: 'center', marginBottom: 30 }}>
-              Sua carteira do COREN foi enviada para nossos servidores.
-            </Text>
+            {!documentoAprovado ? (
+              <>
+                <ActivityIndicator size={80} color="#00ff00" style={{ marginBottom: 30 }} />
+                <Text style={styles.instructionText}>Aguardando Aprovação...</Text>
+                <Text style={{ fontSize: 16, color: '#8b8682', textAlign: 'center', marginBottom: 30 }}>
+                  Nossos admins estão revisando seu documento. Isso não costuma demorar.
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={{ fontSize: 60, marginBottom: 20 }}>✅</Text>
+                <Text style={styles.instructionText}>Documento Aprovado!</Text>
+                <Text style={{ fontSize: 16, color: '#8b8682', textAlign: 'center', marginBottom: 30 }}>
+                  Sua carteira do COREN foi validada com sucesso.
+                </Text>
+
+                <TouchableOpacity 
+                  style={[styles.nextButton, { backgroundColor: '#00ff00' }]} 
+                  onPress={() => router.push({
+                    pathname: '/cadastro_passo5',
+                    params: { ...params, coren_url: urlFinal } 
+                  })}
+                >
+                  <Text style={styles.nextButtonText}>PROSSEGUIR PARA PLANOS</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
-          
-          <TouchableOpacity 
-            style={[styles.nextButton, { backgroundColor: '#00ff00' }]} 
-            onPress={() => router.push({
-              pathname: '/cadastro_passo5',
-              params: { ...params, coren_url: urlFinal } 
-            })}
-          >
-            <Text style={styles.nextButtonText}>PROSSEGUIR PARA PLANOS</Text>
-          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -129,7 +176,6 @@ export default function CadastroPasso4() {
           </TouchableOpacity>
         </View>
 
-        {/* Botão Dinâmico: Se estiver subindo, mostra ActivityIndicator */}
         <TouchableOpacity 
             style={[styles.nextButton, { opacity: isUploading ? 0.7 : 1 }]} 
             onPress={handleSend}
@@ -168,5 +214,5 @@ const styles = StyleSheet.create({
   attachButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   nextButton: { backgroundColor: '#0077c2', width: '100%', height: 70, justifyContent: 'center', alignItems: 'center', borderRadius: 10 },
   nextButtonText: { color: '#000', fontSize: 20, fontWeight: 'bold' },
-  waitingContainer: { alignItems: 'center', marginVertical: 40 }
+  waitingContainer: { alignItems: 'center', marginVertical: 40, width: '100%' }
 });

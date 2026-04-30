@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, ScrollView, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -10,8 +10,35 @@ export default function TelaPagamento() {
   
   const [status, setStatus] = useState('upload'); 
   const [comprovanteUri, setComprovanteUri] = useState(null);
-  // Mantemos o estado apenas para controle visual se necessário
   const [userIdGerado, setUserIdGerado] = useState(null);
+  const [pagamentoAprovado, setPagamentoAprovado] = useState(false);
+
+  // --- MONITORAMENTO REALTIME DA APROVAÇÃO DO PAGAMENTO ---
+  useEffect(() => {
+    if (status === 'concluido' && userIdGerado) {
+      const subscription = supabase
+        .channel('check_pagamento')
+        .on(
+          'postgres_changes',
+          { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'profissional', 
+            filter: `id_usuario=eq.${userIdGerado}` 
+          },
+          (payload) => {
+            if (payload.new.status_pagamento === 'aprovado') {
+              setPagamentoAprovado(true);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(subscription);
+      };
+    }
+  }, [status, userIdGerado]);
 
   const selecionarComprovante = async () => {
     try {
@@ -72,28 +99,27 @@ export default function TelaPagamento() {
         throw erroUsuario;
       }
 
-      // IMPORTANTE: Pegamos o ID diretamente aqui
       const idCriado = novoUsuario.id_usuario || novoUsuario.id; 
       setUserIdGerado(idCriado);
 
-      // 3. CRIAR PROFISSIONAL
+      // 3. CRIAR PROFISSIONAL (Status inicial como pendente)
       const { error: erroProfissional } = await supabase
         .from('profissional')
         .insert([{ 
           id_usuario: idCriado, 
           plano: params.planoId, 
           status_aprovacao: 'pendente',
-          comprovante_url: publicUrl, 
+          status_pagamento: 'pendente', // Garante que comece pendente
+          url_comprovante_pix: publicUrl, // Corrigido para bater com a tabela
           coren_url: params.coren_url,
           descricao: "" 
         }]);
 
       if (erroProfissional) throw erroProfissional;
 
-      // Se chegou aqui, deu tudo certo
       setStatus('concluido');
 
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro no processo:", error);
       Alert.alert("Erro no Cadastro", error.message);
       setStatus('upload');
@@ -112,24 +138,33 @@ export default function TelaPagamento() {
             </>
           ) : (
             <>
-              <Text style={styles.emoji}>✅</Text>
-              <Text style={styles.tituloSucesso}>Tudo pronto!</Text>
-              <Text style={styles.subtituloSucesso}>Seu cadastro foi realizado com sucesso.</Text>
-              
-              <TouchableOpacity 
-                style={styles.botaoProximo} 
-                onPress={() => {
-                  // LOG DE DEBUG
-                  console.log("Navegando com ID:", userIdGerado);
+              {!pagamentoAprovado ? (
+                <>
+                  <ActivityIndicator size={60} color="#00ff00" style={{ marginBottom: 20 }} />
+                  <Text style={styles.tituloSucesso}>Aguardando Aprovação do PIX</Text>
+                  <Text style={styles.subtituloSucesso}>
+                    Recebemos seu comprovante! Um administrador irá validar o pagamento para liberar seu acesso.
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.emoji}>✅</Text>
+                  <Text style={styles.tituloSucesso}>Pagamento Confirmado!</Text>
+                  <Text style={styles.subtituloSucesso}>Sua conta foi liberada. Vamos para o último passo.</Text>
                   
-                  router.push({
-                    pathname: '/cadastro_passo6', 
-                    params: { id_usuario: String(userIdGerado) } 
-                  });
-                }}
-              >
-                <Text style={styles.botaoTextoProximo}>CONFIGURAÇÕES FINAIS ➔</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.botaoProximo} 
+                    onPress={() => {
+                      router.push({
+                        pathname: '/cadastro_passo6', 
+                        params: { id_usuario: String(userIdGerado) } 
+                      });
+                    }}
+                  >
+                    <Text style={styles.botaoTextoProximo}>CONFIGURAÇÕES FINAIS ➔</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </>
           )}
         </View>
@@ -193,7 +228,7 @@ const styles = StyleSheet.create({
   botaoTexto: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   successCard: { padding: 30, alignItems: 'center', width: '90%' },
   emoji: { fontSize: 60, marginBottom: 20 },
-  tituloSucesso: { fontSize: 22, fontWeight: 'bold', color: '#333', marginBottom: 10 },
+  tituloSucesso: { fontSize: 22, fontWeight: 'bold', color: '#333', marginBottom: 10, textAlign: 'center' },
   subtituloSucesso: { textAlign: 'center', color: '#666', marginBottom: 30 },
   botaoProximo: { backgroundColor: '#00ff00', paddingHorizontal: 20, paddingVertical: 15, borderRadius: 10 },
   botaoTextoProximo: { fontWeight: 'bold', color: '#000' }

@@ -11,11 +11,34 @@ export default function DetalhesAgendamento() {
   const [loading, setLoading] = useState(true);
   const [agendamento, setAgendamento] = useState(null);
   const [nota, setNota] = useState(0); 
-  const [avaliado, setAvaliado] = useState(false);
+  const [avaliadoLocal, setAvaliadoLocal] = useState(false);
   const [enviandoAvaliacao, setEnviandoAvaliacao] = useState(false);
+  const [mostrarAvaliacao, setMostrarAvaliacao] = useState(false);
 
   useEffect(() => {
     fetchDetalhes();
+
+    // --- CONFIGURAÇÃO REALTIME ---
+    const subscription = supabase
+      .channel(`agendamento_cliente_${id}`)
+      .on(
+        'postgres_changes',
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'agendamentos', 
+          filter: `id_agendamento=eq.${id}` 
+        },
+        (payload) => {
+          console.log('Mudança detectada no Realtime:', payload);
+          fetchDetalhes(); // Recarrega para garantir que os joins (profissional/serviço) venham atualizados
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
   }, [id]);
 
   const fetchDetalhes = async () => {
@@ -36,13 +59,12 @@ export default function DetalhesAgendamento() {
       if (error) throw error;
       setAgendamento(data);
     } catch (error) {
-      Alert.alert("Erro", "Não foi possível carregar o agendamento.");
+      console.error("Erro ao carregar detalhes:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- NOVA FUNÇÃO: ENVIAR AVALIAÇÃO COM LOGS ---
   const enviarAvaliacao = async () => {
     if (nota === 0) {
       Alert.alert("Aviso", "Selecione uma estrela antes de enviar.");
@@ -51,69 +73,48 @@ export default function DetalhesAgendamento() {
 
     try {
       setEnviandoAvaliacao(true);
-      console.log("--- INICIANDO PROCESSO DE AVALIAÇÃO ---");
-      console.log("ID Profissional:", agendamento.id_profissional);
-      console.log("ID Cliente:", agendamento.id_cliente);
-
-      // 1. Buscar dados atuais do profissional para o cálculo
+      
       const { data: prof, error: profError } = await supabase
         .from('profissional')
         .select('media_avaliacao, total_avaliacoes')
         .eq('id_profissional', agendamento.id_profissional)
         .single();
 
-      if (profError) {
-        console.error("Erro ao buscar profissional no BD:", profError.message);
-        throw profError;
-      }
-
-      console.log("Dados atuais do Prof no BD:", prof);
+      if (profError) throw profError;
 
       const qtdAnterior = prof.total_avaliacoes || 0;
       const mediaAtual = prof.media_avaliacao || 0;
       const novaQtd = qtdAnterior + 1;
       const novaMedia = ((mediaAtual * qtdAnterior) + nota) / novaQtd;
 
-      console.log(`Calculando: Nova Qtd: ${novaQtd}, Nova Média: ${novaMedia}`);
-
-      // 2. Atualizar tabela Profissional
       const { error: updateProfError } = await supabase
         .from('profissional')
-        .update({ 
-          media_avaliacao: novaMedia, 
-          total_avaliacoes: novaQtd 
-        })
+        .update({ media_avaliacao: novaMedia, total_avaliacoes: novaQtd })
         .eq('id_profissional', agendamento.id_profissional);
 
-      if (updateProfError) {
-        console.error("Erro ao dar Update no Profissional:", updateProfError.message);
-        throw updateProfError;
-      }
-      console.log("✅ Tabela Profissional atualizada!");
+      if (updateProfError) throw updateProfError;
 
-      // 3. Atualizar tabela Usuario (Serviços Recebidos do Cliente)
-      const { data: userData, error: userFetchError } = await supabase
+      const { data: userData } = await supabase
         .from('usuario')
         .select('servicos_recebidos')
         .eq('id_usuario', agendamento.id_cliente)
         .single();
 
-      if (userFetchError) console.error("Erro ao buscar dados do cliente:", userFetchError.message);
-
-      const { error: updateUserError } = await supabase
+      await supabase
         .from('usuario')
-        .update({ servicos_recebidos: (userData?.servicos_rece_bidos || 0) + 1 })
+        .update({ servicos_recebidos: (userData?.servicos_recebidos || 0) + 1 })
         .eq('id_usuario', agendamento.id_cliente);
 
-      if (updateUserError) {
-        console.error("Erro ao atualizar servicos_recebidos do cliente:", updateUserError.message);
-      } else {
-        console.log("✅ Tabela Usuario (Cliente) atualizada!");
-      }
+      const { error: updateAgendError } = await supabase
+        .from('agendamentos')
+        .update({ finalizado_cliente: true })
+        .eq('id_agendamento', id);
 
-      setAvaliado(true);
+      if (updateAgendError) throw updateAgendError;
+
+      setAvaliadoLocal(true);
     } catch (error) {
-      console.error("Erro Geral na Função enviarAvaliacao:", error);
+      console.error("Erro na avaliação:", error);
       Alert.alert("Erro", "Não foi possível processar sua avaliação.");
     } finally {
       setEnviandoAvaliacao(false);
@@ -131,6 +132,7 @@ export default function DetalhesAgendamento() {
   };
 
   const getStatusPagamento = () => {
+    if (!agendamento) return "";
     const { pagamento_cliente, pagamento_profissional } = agendamento;
     if (pagamento_cliente && pagamento_profissional) return "Pagamento Concluído";
     if (pagamento_cliente) return "Pagamento Informado pelo Cliente";
@@ -140,12 +142,18 @@ export default function DetalhesAgendamento() {
 
   const atualizarStatus = async (coluna, valor) => {
     try {
+      // Atualização Otimista local
+      setAgendamento(prev => ({ ...prev, [coluna]: valor }));
+
       const { error } = await supabase
         .from('agendamentos')
         .update({ [coluna]: valor })
         .eq('id_agendamento', id);
-      if (error) throw error;
-      fetchDetalhes();
+      
+      if (error) {
+        fetchDetalhes(); // Reverte em caso de erro
+        throw error;
+      }
     } catch (error) {
       Alert.alert("Erro", "Falha ao atualizar status.");
     }
@@ -154,19 +162,17 @@ export default function DetalhesAgendamento() {
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#C5005E" /></View>;
 
   const statusAtend = getStatusAtendimento();
-  const todosFinalizados = agendamento.finalizado_cliente && agendamento.finalizado_profissional;
   const pagamentoConcluido = agendamento.pagamento_cliente && agendamento.pagamento_profissional;
 
-  // --- RENDER DA AVALIAÇÃO ---
-  if (todosFinalizados && pagamentoConcluido && !avaliado) {
+  if (mostrarAvaliacao && !avaliadoLocal) {
     return (
       <View style={styles.container}>
         <View style={styles.headerModal}>
-           <TouchableOpacity onPress={() => router.back()}><Ionicons name="close" size={30} color="red" /></TouchableOpacity>
+           <TouchableOpacity onPress={() => setMostrarAvaliacao(false)}><Ionicons name="arrow-back" size={30} color="black" /></TouchableOpacity>
            <Text style={styles.headerTitle}>Avaliar Procedimento</Text>
         </View>
         <View style={styles.evalContainer}>
-          <Text style={styles.evalText}>Avalie o atendimento recebido para ajudar outros usuários.</Text>
+          <Text style={styles.evalText}>Como foi o atendimento com {agendamento.profissional?.usuario?.nome_usuario}?</Text>
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((star) => (
               <TouchableOpacity key={star} onPress={() => setNota(star)}>
@@ -183,22 +189,18 @@ export default function DetalhesAgendamento() {
             onPress={enviarAvaliacao}
             disabled={enviandoAvaliacao}
           >
-            {enviandoAvaliacao ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <Text style={styles.btnText}>Enviar Avaliação</Text>
-            )}
+            {enviandoAvaliacao ? <ActivityIndicator color="#000" /> : <Text style={styles.btnText}>Confirmar e Finalizar</Text>}
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  if (avaliado) {
+  if (avaliadoLocal) {
     return (
       <View style={[styles.container, styles.center]}>
          <Ionicons name="checkmark-circle-outline" size={120} color="#32CD32" />
-         <Text style={styles.successText}>Avaliação Enviada com sucesso</Text>
+         <Text style={styles.successText}>Atendimento Finalizado!</Text>
          <TouchableOpacity style={styles.btnVoltar} onPress={() => router.replace('/cliente/dashboard')}>
             <Text style={styles.btnText}>Voltar ao Início</Text>
          </TouchableOpacity>
@@ -215,53 +217,49 @@ export default function DetalhesAgendamento() {
 
       <View style={styles.infoSection}>
         <Text style={styles.infoText}>Profissional: {agendamento.profissional?.usuario?.nome_usuario}</Text>
-        <Text style={styles.infoText}>Serviço: {agendamento.servico?.nome_servico}</Text>
         <Text style={styles.infoText}>Horário Marcado: {agendamento.hora_agendamento}</Text>
       </View>
 
       <View style={styles.statusSection}>
         <Text style={styles.sectionTitle}>Status Do Atendimento</Text>
         <View style={styles.statusRow}>
-           <Text style={styles.statusLabel}>Cliente: {agendamento.presenca_cliente ? "Confirmado 🟢" : "Aguardando Confirmação 🟡"}</Text>
-           <Text style={styles.statusLabel}>Profissional: {agendamento.presenca_profissional ? "Confirmado 🟢" : "Aguardando Confirmação 🟡"}</Text>
+           <Text style={styles.statusLabel}>Sua confirmação: {agendamento.presenca_cliente ? "Confirmado 🟢" : "Pendente 🟡"}</Text>
+           <Text style={styles.statusLabel}>Profissional: {agendamento.presenca_profissional ? "Confirmado 🟢" : "Pendente 🟡"}</Text>
         </View>
         <Text style={[styles.mainStatus, { color: statusAtend.cor }]}>{statusAtend.icon} {statusAtend.texto}</Text>
       </View>
 
       <View style={styles.actions}>
         {!agendamento.presenca_cliente ? (
-          <>
-            <TouchableOpacity style={styles.btnConfirmar} onPress={() => atualizarStatus('presenca_cliente', true)}>
-              <Text style={styles.btnText}>Confirmar Presença</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.btnCancelar} onPress={() => Alert.alert("Cancelar", "Deseja cancelar?")}>
-              <Text style={styles.btnText}>Cancelar Procedimento</Text>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity style={styles.btnConfirmar} onPress={() => atualizarStatus('presenca_cliente', true)}>
+            <Text style={styles.btnText}>Confirmar Presença</Text>
+          </TouchableOpacity>
         ) : !agendamento.finalizado_cliente ? (
-          <>
-            <TouchableOpacity style={styles.btnConfirmar} onPress={() => atualizarStatus('finalizado_cliente', true)}>
-              <Text style={styles.btnText}>Marcar como Finalizado</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.btnIntercorrencia}>
-              <Text style={styles.btnText}>Abrir Intercorrência</Text>
-            </TouchableOpacity>
-          </>
+          <TouchableOpacity 
+            style={styles.btnConfirmar} 
+            onPress={() => {
+              if(!pagamentoConcluido) {
+                  Alert.alert("Aviso", "Confirme o pagamento antes de finalizar.");
+              } else {
+                  setMostrarAvaliacao(true);
+              }
+            }}
+          >
+            <Text style={styles.btnText}>Marcar como Finalizado</Text>
+          </TouchableOpacity>
         ) : null}
       </View>
 
-      {!pagamentoConcluido && (
-        <View style={styles.statusSection}>
-          <View style={styles.divider} />
-          <Text style={styles.sectionTitle}>Status Do Pagamento</Text>
-          <Text style={styles.statusLabel}>{getStatusPagamento()}</Text>
-          {!agendamento.pagamento_cliente && (
-            <TouchableOpacity style={styles.btnConfirmar} onPress={() => atualizarStatus('pagamento_cliente', true)}>
-              <Text style={styles.btnText}>Marcar Pagamento como Efetuado</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+      <View style={styles.statusSection}>
+        <View style={styles.divider} />
+        <Text style={styles.sectionTitle}>Pagamento</Text>
+        <Text style={styles.statusLabel}>{getStatusPagamento()}</Text>
+        {!agendamento.pagamento_cliente && (
+          <TouchableOpacity style={styles.btnConfirmar} onPress={() => atualizarStatus('pagamento_cliente', true)}>
+            <Text style={styles.btnText}>Informar Pagamento Efetuado</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -281,8 +279,6 @@ const styles = StyleSheet.create({
   mainStatus: { fontSize: 20, fontWeight: '900', marginTop: 10 },
   actions: { padding: 20, gap: 15 },
   btnConfirmar: { backgroundColor: '#00FF00', padding: 20, borderRadius: 5, alignItems: 'center', borderWidth: 1 },
-  btnCancelar: { backgroundColor: '#FF0000', padding: 20, borderRadius: 5, alignItems: 'center', borderWidth: 1 },
-  btnIntercorrencia: { backgroundColor: '#FFA500', padding: 20, borderRadius: 5, alignItems: 'center', borderWidth: 1 },
   btnVoltar: { backgroundColor: '#FF9900', padding: 20, width: '80%', borderRadius: 5, alignItems: 'center' },
   btnText: { fontSize: 18, fontWeight: 'bold', color: '#000' },
   divider: { height: 2, backgroundColor: '#000', width: '100%', marginVertical: 20 },

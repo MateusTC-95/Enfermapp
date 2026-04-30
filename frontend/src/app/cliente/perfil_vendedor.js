@@ -21,7 +21,7 @@ export default function PerfilVendedor() {
         .select(`
           id_profissional,
           descricao,
-          avaliacao_media,
+          media_avaliacao,
           usuario!inner (nome_usuario, cidade, foto_perfil, telefone)
         `)
         .eq('id_profissional', id)
@@ -68,12 +68,12 @@ export default function PerfilVendedor() {
             {[1, 2, 3, 4, 5].map((star) => (
               <Ionicons 
                 key={star} 
-                name={star <= Math.round(profissional?.avaliacao_media || 0) ? "star" : "star-outline"} 
+                name={star <= Math.round(profissional?.media_avaliacao || 0) ? "star" : "star-outline"} 
                 size={24} 
                 color="#fd6601" 
               />
             ))}
-            <Text style={styles.ratingText}>({profissional?.avaliacao_media || '0.0'})</Text>
+            <Text style={styles.ratingText}>({profissional?.media_avaliacao || '0.0'})</Text>
           </View>
 
           <Text style={styles.cidade}>{profissional?.usuario?.cidade}</Text>
