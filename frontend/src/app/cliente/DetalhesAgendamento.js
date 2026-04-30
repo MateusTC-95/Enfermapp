@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../services/api';
@@ -18,7 +18,6 @@ export default function DetalhesAgendamento() {
   useEffect(() => {
     fetchDetalhes();
 
-    // --- CONFIGURAÇÃO REALTIME ---
     const subscription = supabase
       .channel(`agendamento_cliente_${id}`)
       .on(
@@ -30,8 +29,7 @@ export default function DetalhesAgendamento() {
           filter: `id_agendamento=eq.${id}` 
         },
         (payload) => {
-          console.log('Mudança detectada no Realtime:', payload);
-          fetchDetalhes(); // Recarrega para garantir que os joins (profissional/serviço) venham atualizados
+          fetchDetalhes();
         }
       )
       .subscribe();
@@ -47,6 +45,7 @@ export default function DetalhesAgendamento() {
         .from('agendamentos')
         .select(`
           *,
+          cliente:id_cliente ( nome_usuario ),
           profissional:id_profissional ( 
             id_profissional,
             usuario:id_usuario (nome_usuario) 
@@ -87,12 +86,10 @@ export default function DetalhesAgendamento() {
       const novaQtd = qtdAnterior + 1;
       const novaMedia = ((mediaAtual * qtdAnterior) + nota) / novaQtd;
 
-      const { error: updateProfError } = await supabase
+      await supabase
         .from('profissional')
         .update({ media_avaliacao: novaMedia, total_avaliacoes: novaQtd })
         .eq('id_profissional', agendamento.id_profissional);
-
-      if (updateProfError) throw updateProfError;
 
       const { data: userData } = await supabase
         .from('usuario')
@@ -114,7 +111,6 @@ export default function DetalhesAgendamento() {
 
       setAvaliadoLocal(true);
     } catch (error) {
-      console.error("Erro na avaliação:", error);
       Alert.alert("Erro", "Não foi possível processar sua avaliação.");
     } finally {
       setEnviandoAvaliacao(false);
@@ -142,21 +138,29 @@ export default function DetalhesAgendamento() {
 
   const atualizarStatus = async (coluna, valor) => {
     try {
-      // Atualização Otimista local
       setAgendamento(prev => ({ ...prev, [coluna]: valor }));
-
-      const { error } = await supabase
-        .from('agendamentos')
-        .update({ [coluna]: valor })
-        .eq('id_agendamento', id);
-      
+      const { error } = await supabase.from('agendamentos').update({ [coluna]: valor }).eq('id_agendamento', id);
       if (error) {
-        fetchDetalhes(); // Reverte em caso de erro
+        fetchDetalhes();
         throw error;
       }
     } catch (error) {
       Alert.alert("Erro", "Falha ao atualizar status.");
     }
+  };
+
+  // --- FUNÇÃO PARA IR PARA INTERCORRÊNCIA ---
+  const abrirIntercorrencia = () => {
+    router.push({
+      pathname: '/criar_intercorrencia',
+      params: {
+        id_agendamento: agendamento.id_agendamento,
+        aberto_por: agendamento.cliente?.nome_usuario || 'Cliente',
+        contra_quem: agendamento.profissional?.usuario?.nome_usuario || 'Profissional',
+        nome_servico: agendamento.servico?.nome_servico,
+        tipo_usuario: 'cliente' // Identifica que quem está abrindo é o cliente
+      }
+    });
   };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#C5005E" /></View>;
@@ -176,19 +180,11 @@ export default function DetalhesAgendamento() {
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((star) => (
               <TouchableOpacity key={star} onPress={() => setNota(star)}>
-                <Ionicons 
-                  name={nota >= star ? "star" : "star-outline"} 
-                  size={50} 
-                  color="#FFD700" 
-                />
+                <Ionicons name={nota >= star ? "star" : "star-outline"} size={50} color="#FFD700" />
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity 
-            style={styles.btnConfirmar} 
-            onPress={enviarAvaliacao}
-            disabled={enviandoAvaliacao}
-          >
+          <TouchableOpacity style={styles.btnConfirmar} onPress={enviarAvaliacao} disabled={enviandoAvaliacao}>
             {enviandoAvaliacao ? <ActivityIndicator color="#000" /> : <Text style={styles.btnText}>Confirmar e Finalizar</Text>}
           </TouchableOpacity>
         </View>
@@ -260,6 +256,17 @@ export default function DetalhesAgendamento() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* --- SEÇÃO DE INTERCORRÊNCIA --- */}
+      <View style={styles.intercorrenciaSection}>
+        <View style={styles.divider} />
+        <TouchableOpacity style={styles.btnIntercorrencia} onPress={abrirIntercorrencia}>
+          <Ionicons name="warning-outline" size={24} color="black" />
+          <Text style={styles.btnIntercorrenciaText}>Tive um problema / Abrir Intercorrência</Text>
+        </TouchableOpacity>
+        <Text style={styles.helpText}>Use este botão caso o atendimento não tenha ocorrido como esperado ou haja disputa de valores.</Text>
+      </View>
+      <View style={{height: 50}} />
     </ScrollView>
   );
 }
@@ -286,4 +293,19 @@ const styles = StyleSheet.create({
   evalText: { fontSize: 18, textAlign: 'center', marginBottom: 40 },
   starsRow: { flexDirection: 'row', marginBottom: 50 },
   successText: { fontSize: 22, fontWeight: 'bold', marginVertical: 20 },
+  
+  // Estilos novos para Intercorrência
+  intercorrenciaSection: { padding: 20, alignItems: 'center' },
+  btnIntercorrencia: { 
+    flexDirection: 'row', 
+    backgroundColor: '#FF4444', 
+    padding: 15, 
+    borderRadius: 5, 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    width: '100%', 
+    justifyContent: 'center' 
+  },
+  btnIntercorrenciaText: { fontSize: 16, fontWeight: 'bold', color: '#000', marginLeft: 10 },
+  helpText: { fontSize: 12, color: '#333', textAlign: 'center', marginTop: 10, fontStyle: 'italic' }
 });

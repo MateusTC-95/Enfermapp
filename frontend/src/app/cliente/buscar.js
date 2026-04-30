@@ -12,51 +12,40 @@ export default function BuscarServicos() {
   const [profissionais, setProfissionais] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // 1. Busca a lista de serviços ao carregar
   useEffect(() => {
     fetchServicos();
   }, []);
 
   const fetchServicos = async () => {
     try {
-      console.log("Tentando buscar serviços no Supabase...");
       const { data, error } = await supabase.from('servicos').select('*');
-      
-      if (error) {
-        console.error("Erro Supabase:", error.message);
-        Alert.alert("Erro no Banco", error.message);
-        return;
-      }
-
-      console.log("Serviços recebidos:", data?.length || 0);
+      if (error) throw error;
       setServicos(data || []);
     } catch (err) {
-      console.error("Erro inesperado:", err);
-      Alert.alert("Erro Crítico", "Falha ao conectar com o serviço.");
+      console.error(err);
+      Alert.alert("Erro", "Falha ao carregar serviços.");
     }
   };
 
   const buscarProfissionais = async (idServico) => {
     setLoading(true);
     try {
-      console.log("Buscando profissionais para o serviço:", idServico);
       const { data, error } = await supabase
         .from('profissional')
         .select(`
           id_profissional,
+          plano,
           usuario!inner (nome_usuario, cidade, foto_perfil, telefone),
           servicos_profissional!inner (id_servico)
         `)
-        .eq('servicos_profissional.id_servico', idServico);
-        // Removi temporariamente o filtro de status_aprovacao para testar
+        .eq('servicos_profissional.id_servico', idServico)
+        .order('plano', { ascending: false }); // Premium vem antes de Normal (P > N)
 
       if (error) throw error;
 
-      console.log("Profissionais encontrados:", data?.length || 0);
       setProfissionais(data || []);
       setPasso(3); 
     } catch (error) {
-      console.error("Erro na busca:", error.message);
       Alert.alert("Erro na Busca", error.message);
     } finally {
       setLoading(false);
@@ -67,31 +56,13 @@ export default function BuscarServicos() {
   if (passo === 1) {
     return (
       <View style={styles.container}>
-        <TouchableOpacity 
-          activeOpacity={0.7}
-          style={styles.buttonWhite} 
-          onPress={() => {
-            console.log("Botão clicado! Mudando para passo 2...");
-            setPasso(2);
-          }}
-        >
+        <TouchableOpacity style={styles.buttonWhite} onPress={() => setPasso(2)}>
           <Text style={styles.titletext}>Clique Aqui para Buscar um Serviço</Text>
         </TouchableOpacity>
-        
-        <Text style={styles.texto}>
-          Busque o serviço desejado e encontre profissionais disponíveis na sua região de forma rápida e segura.
-        </Text>
-        
+        <Text style={styles.texto}>Busque o serviço desejado e encontre profissionais disponíveis na sua região.</Text>
         <View style={styles.centralizacaoIcon}>
           <Ionicons name="search-outline" size={100} color="black" />
         </View>
-
-        {/* Aviso visual caso a lista de serviços esteja vazia */}
-        {servicos.length === 0 && (
-          <Text style={{color: 'red', textAlign: 'center', marginTop: 10}}>
-            Aviso: Nenhum serviço carregado do banco ainda.
-          </Text>
-        )}
       </View>
     );
   }
@@ -104,7 +75,7 @@ export default function BuscarServicos() {
           <TouchableOpacity onPress={() => setPasso(1)}>
             <Ionicons name="close-outline" size={40} color="red" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Selecione o Tipo de Serviço</Text>
+          <Text style={styles.headerTitle}>Selecione o Serviço</Text>
         </View>
 
         <ScrollView style={{ flex: 1 }}>
@@ -112,30 +83,17 @@ export default function BuscarServicos() {
             <TouchableOpacity 
               key={item.id_servico} 
               style={styles.radioOption}
-              onPress={() => {
-                console.log("Serviço selecionado:", item.nome_servico);
-                setServicoSelecionado(item);
-              }}
+              onPress={() => setServicoSelecionado(item)}
             >
-              <View style={[
-                styles.radioCircle, 
-                servicoSelecionado?.id_servico === item.id_servico && styles.radioSelected
-              ]} />
+              <View style={[styles.radioCircle, servicoSelecionado?.id_servico === item.id_servico && styles.radioSelected]} />
               <Text style={styles.radioText}>{item.nome_servico}</Text>
             </TouchableOpacity>
           ))}
-          {servicos.length === 0 && <Text style={styles.texto}>Carregando serviços...</Text>}
         </ScrollView>
 
         <TouchableOpacity 
           style={[styles.btnProcurar, !servicoSelecionado && {opacity: 0.5}]} 
-          onPress={() => {
-            if(!servicoSelecionado) {
-                Alert.alert("Aviso", "Selecione um serviço primeiro!");
-                return;
-            }
-            buscarProfissionais(servicoSelecionado.id_servico);
-          }}
+          onPress={() => servicoSelecionado && buscarProfissionais(servicoSelecionado.id_servico)}
         >
           {loading ? <ActivityIndicator color="white" /> : <Text style={styles.btnProcurarText}>Procurar Profissionais</Text>}
         </TouchableOpacity>
@@ -153,30 +111,44 @@ export default function BuscarServicos() {
           </TouchableOpacity>
           <View style={{flex: 1}}>
             <Text style={styles.headerTitle}>Profissionais Encontrados</Text>
-            <Text style={styles.subTitleResult}>Procedimento: {servicoSelecionado?.nome_servico}</Text>
+            <Text style={styles.subTitleResult}>{servicoSelecionado?.nome_servico}</Text>
           </View>
         </View>
-
-        <Text style={styles.instrucao}>Selecione um dos profissionais listados para visualizar o perfil completo.</Text>
 
         <FlatList
           data={profissionais}
           keyExtractor={(item) => item.id_profissional.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.cardProfissional}
-              onPress={() => {
-                console.log("Navegando para perfil do profissional ID:", item.id_profissional);
-                router.push({
-                  pathname: '/cliente/perfil_vendedor',
-                  params: { id: item.id_profissional, servicoId: servicoSelecionado?.id_servico }
-                });
-              }}
-            >
-              <Text style={styles.nomeProfissional}>{item.usuario?.nome_usuario || "Sem Nome"}</Text>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={<Text style={styles.texto}>Nenhum profissional encontrado para este serviço.</Text>}
+          contentContainerStyle={{ paddingVertical: 10 }}
+          renderItem={({ item }) => {
+            const isPremium = item.plano === 'premium';
+            
+            return (
+              <TouchableOpacity 
+                style={[
+                  styles.cardProfissional, 
+                  isPremium && styles.cardPremium // Aplica fundo preto se for premium
+                ]}
+                onPress={() => {
+                  router.push({
+                    pathname: '/cliente/perfil_vendedor',
+                    params: { id: item.id_profissional, servicoId: servicoSelecionado?.id_servico }
+                  });
+                }}
+              >
+                <View style={styles.rowCard}>
+                  {isPremium && <Ionicons name="star" size={20} color="#FFD700" style={{ marginRight: 10 }} />}
+                  <Text style={[
+                    styles.nomeProfissional, 
+                    isPremium && styles.textoPremium // Aplica texto amarelo se for premium
+                  ]}>
+                    {item.usuario?.nome_usuario || "Sem Nome"}
+                  </Text>
+                  {isPremium && <Text style={styles.badgePremium}>PREMIUM</Text>}
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+          ListEmptyComponent={<Text style={styles.texto}>Nenhum profissional encontrado.</Text>}
         />
       </View>
     );
@@ -198,7 +170,31 @@ const styles = StyleSheet.create({
   radioText: { fontSize: 16, flex: 1, fontWeight: 'bold', color: '#000' },
   btnProcurar: { backgroundColor: '#C5005E', padding: 20, alignItems: 'center' },
   btnProcurarText: { color: 'white', fontSize: 20, fontWeight: 'bold' },
-  instrucao: { textAlign: 'center', fontSize: 16, padding: 15, color: '#000' },
-  cardProfissional: { backgroundColor: '#D9D9D9', padding: 20, marginVertical: 5, marginHorizontal: 10, alignItems: 'center', borderRadius: 5 },
+  cardProfissional: { backgroundColor: '#D9D9D9', padding: 20, marginVertical: 6, marginHorizontal: 15, borderRadius: 10, elevation: 3 },
+  
+  // ESTILOS PREMIUM
+  cardPremium: { 
+    backgroundColor: '#000', 
+    borderColor: '#FFD700', 
+    borderWidth: 1.5,
+    shadowColor: "#FFD700",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
+  },
+  textoPremium: { 
+    color: '#FFD700', // Amarelo Gold
+  },
+  rowCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  badgePremium: {
+    backgroundColor: '#FFD700',
+    color: '#000',
+    fontSize: 10,
+    fontWeight: 'bold',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 5,
+    marginLeft: 10
+  },
   nomeProfissional: { fontSize: 18, fontWeight: 'bold', color: '#000' }
 });

@@ -18,7 +18,8 @@ export default function Perfil() {
     cidade: '',
     telefone: '',
     pagamento_usado: '',
-    servicos_recebidos: 0 // Adicionado ao estado
+    servicos_recebidos: 0,
+    advertencias: 0 // Estado atualizado para o nome correto
   });
 
   const buscarDados = async () => {
@@ -30,10 +31,10 @@ export default function Perfil() {
         return;
       }
 
-      // Adicionado 'servicos_recebidos' no select
+      // Agora buscando a coluna 'advertencias' conforme o seu Banco de Dados
       const { data, error } = await supabase
         .from('usuario')
-        .select('nome_usuario, cidade, telefone, pagamento_usado, foto_perfil, servicos_recebidos')
+        .select('nome_usuario, cidade, telefone, pagamento_usado, foto_perfil, servicos_recebidos, advertencias')
         .eq('nome_usuario', nomeSalvo) 
         .single();
 
@@ -45,7 +46,8 @@ export default function Perfil() {
           cidade: data.cidade || 'Não informada',
           telefone: data.telefone || 'Não informado',
           pagamento_usado: data.pagamento_usado || 'Não informado',
-          servicos_recebidos: data.servicos_recebidos || 0 // Mapeando o valor do banco
+          servicos_recebidos: data.servicos_recebidos || 0,
+          advertencias: data.advertencias || 0 // Mapeando o valor real
         });
         setFoto(data.foto_perfil);
       }
@@ -157,8 +159,24 @@ export default function Perfil() {
 
           <View style={styles.infoRow}>
             <Ionicons name="briefcase-outline" size={20} color="black" />
-            {/* Agora exibe o valor real vindo do banco de dados */}
             <Text style={styles.infoLabel}>Serviços Recebidos: <Text style={styles.infoValue}>{dadosUsuario.servicos_recebidos}</Text></Text>
+          </View>
+
+          {/* NOVA LINHA: ADVERTÊNCIAS */}
+          <View style={styles.infoRow}>
+            <Ionicons 
+              name="alert-circle-outline" 
+              size={20} 
+              color={dadosUsuario.advertencias > 0 ? "red" : "black"} 
+            />
+            <Text style={styles.infoLabel}>
+              Advertências: <Text style={[
+                styles.infoValue, 
+                dadosUsuario.advertencias > 0 && { color: 'red', fontWeight: 'bold' }
+              ]}>
+                {dadosUsuario.advertencias}
+              </Text>
+            </Text>
           </View>
 
           <View style={styles.subSection}>

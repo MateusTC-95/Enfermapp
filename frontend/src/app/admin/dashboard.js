@@ -33,6 +33,13 @@ export default function DashboardAdmin() {
           <Text style={styles.buttonText}>INTERCORRÊNCIAS{'\n'}PENDENTES</Text>
         </TouchableOpacity>
 
+            <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={() => router.replace('/login')}
+        >
+          <Text style={styles.logoutText}>Sair da Conta</Text>
+        </TouchableOpacity>
+
       </View>
     </SafeAreaView>
   );
@@ -79,4 +86,11 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     letterSpacing: 1,
   },
+   logoutButton: {
+    marginTop: 50,
+  },
+  logoutText: {
+    color: '#cc0000',
+    fontWeight: 'bold',
+  }
 });

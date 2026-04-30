@@ -22,6 +22,7 @@ export default function PerfilProfissional() {
     media_avaliacao: 0,
     total_avaliacoes: 0,
     horario: '',
+    advertencias: 0 // Novo campo no estado
   });
 
   const buscarDados = async () => {
@@ -30,7 +31,7 @@ export default function PerfilProfissional() {
       const nomeSalvo = await AsyncStorage.getItem('nome_logado');
       if (!nomeSalvo) { router.replace('/login'); return; }
 
-      // Ajustado para os nomes de colunas corretos: media_avaliacao e total_avaliacoes
+      // Adicionado 'advertencias' dentro do select do usuario
       const { data: prof, error: profError } = await supabase
         .from('profissional')
         .select(`
@@ -38,7 +39,7 @@ export default function PerfilProfissional() {
           descricao, 
           media_avaliacao, 
           total_avaliacoes,
-          usuario!inner (id_usuario, nome_usuario, cidade, telefone, foto_perfil)
+          usuario!inner (id_usuario, nome_usuario, cidade, telefone, foto_perfil, advertencias)
         `)
         .eq('usuario.nome_usuario', nomeSalvo)
         .maybeSingle();
@@ -61,6 +62,7 @@ export default function PerfilProfissional() {
           descricao: prof.descricao || 'Nenhuma descrição informada.',
           media_avaliacao: prof.media_avaliacao || 0,
           total_avaliacoes: prof.total_avaliacoes || 0,
+          advertencias: prof.usuario?.advertencias || 0, // Mapeando as advertências
           horario: resH.data?.tipo_horario === 'sem_horario_fixo' 
             ? 'Atendimento 24h' 
             : (resH.data?.horario_inicio ? `${resH.data.horario_inicio.slice(0,5)} - ${resH.data.horario_fim.slice(0,5)}` : 'Horário não definido'),
@@ -69,7 +71,7 @@ export default function PerfilProfissional() {
         if (prof.usuario?.foto_perfil) setFoto(prof.usuario.foto_perfil);
       }
     } catch (error) {
-      console.error("Erro ao carregar perfil:", error.message);
+      console.error("Erro ao carregar perfil profissional:", error.message);
     } finally {
       setFetching(false);
     }
@@ -151,7 +153,6 @@ export default function PerfilProfissional() {
           </TouchableOpacity>
           <View style={styles.userInfo}>
             <Text style={styles.name}>{dados.nome_usuario}</Text>
-            {/* Exibe a média formatada e o total de avaliações */}
             <Text style={styles.avisoText}>
               ⭐ {Number(dados.media_avaliacao).toFixed(1)} ({dados.total_avaliacoes} avaliações)
             </Text>
@@ -176,6 +177,23 @@ export default function PerfilProfissional() {
           <View style={styles.infoRow}>
             <Ionicons name="time-outline" size={20} color="black" />
             <Text style={styles.infoLabel}>Horário: <Text style={styles.infoValue}>{dados.horario}</Text></Text>
+          </View>
+
+          {/* NOVA LINHA: ADVERTÊNCIAS DO PROFISSIONAL */}
+          <View style={styles.infoRow}>
+            <Ionicons 
+              name="alert-circle-outline" 
+              size={20} 
+              color={dados.advertencias > 0 ? "red" : "black"} 
+            />
+            <Text style={styles.infoLabel}>
+              Advertências: <Text style={[
+                styles.infoValue, 
+                dados.advertencias > 0 && { color: 'red', fontWeight: 'bold' }
+              ]}>
+                {dados.advertencias}
+              </Text>
+            </Text>
           </View>
 
           <View style={styles.subSection}>

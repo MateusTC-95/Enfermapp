@@ -19,6 +19,10 @@ export default function DetalhesAgendamentoProfissional() {
         .select(`
           *,
           cliente:id_cliente ( nome_usuario, telefone ),
+          profissional:id_profissional ( 
+            id_profissional,
+            usuario:id_usuario ( nome_usuario ) 
+          ),
           servico:id_servico ( nome_servico )
         `)
         .eq('id_agendamento', id)
@@ -44,7 +48,7 @@ export default function DetalhesAgendamentoProfissional() {
         { event: '*', schema: 'public', table: 'agendamentos', filter: `id_agendamento=eq.${id}` },
         (payload) => {
           console.log("Mudança detectada no banco:", payload);
-          fetchDetalhes(); // Recarrega tudo quando houver mudança
+          fetchDetalhes(); 
         }
       )
       .subscribe();
@@ -56,7 +60,6 @@ export default function DetalhesAgendamentoProfissional() {
 
   const atualizarStatus = async (coluna, valor) => {
     try {
-      // Atualização otimista (muda na tela antes de ir pro banco)
       setAgendamento(prev => ({ ...prev, [coluna]: valor }));
 
       const { error } = await supabase
@@ -67,8 +70,22 @@ export default function DetalhesAgendamentoProfissional() {
       if (error) throw error;
     } catch (error) {
       Alert.alert("Erro", "Falha ao atualizar status.");
-      fetchDetalhes(); // Volta ao estado original em caso de erro
+      fetchDetalhes(); 
     }
+  };
+
+  // --- FUNÇÃO PARA ABRIR INTERCORRÊNCIA ---
+  const abrirIntercorrencia = () => {
+    router.push({
+      pathname: '/criar_intercorrencia',
+      params: {
+        id_agendamento: agendamento.id_agendamento,
+        aberto_por: agendamento.profissional?.usuario?.nome_usuario || 'Profissional',
+        contra_quem: agendamento.cliente?.nome_usuario || 'Cliente',
+        nome_servico: agendamento.servico?.nome_servico,
+        tipo_usuario: 'profissional' // Identifica o profissional como autor
+      }
+    });
   };
 
   const getStatusAtendimento = () => {
@@ -83,14 +100,14 @@ export default function DetalhesAgendamentoProfissional() {
   };
 
   const getStatusPagamento = () => {
-  if (!agendamento) return "";
-  const { pagamento_cliente, pagamento_profissional } = agendamento;
+    if (!agendamento) return "";
+    const { pagamento_cliente, pagamento_profissional } = agendamento;
 
-  if (pagamento_cliente && pagamento_profissional) return "Recebimento Confirmado ✅";
-  if (pagamento_cliente && !pagamento_profissional) return "Pagamento Informado pelo Cliente 🔔";
-  if (!pagamento_cliente && pagamento_profissional) return "Recebimento Confirmado (Manual) ✅";
-  return "Aguardando Pagamento ⏳";
-};
+    if (pagamento_cliente && pagamento_profissional) return "Recebimento Confirmado ✅";
+    if (pagamento_cliente && !pagamento_profissional) return "Pagamento Informado pelo Cliente 🔔";
+    if (!pagamento_cliente && pagamento_profissional) return "Recebimento Confirmado (Manual) ✅";
+    return "Aguardando Pagamento ⏳";
+  };
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#00FFFF" /></View>;
 
@@ -139,7 +156,7 @@ export default function DetalhesAgendamentoProfissional() {
         <View style={styles.divider} />
         <Text style={styles.sectionTitle}>Pagamento</Text>
         <Text style={styles.statusLabel}>
-            {agendamento.pagamento_profissional ? "Recebimento Confirmado" : "Aguardando Recebimento"}
+            {getStatusPagamento()}
         </Text>
         {!agendamento.pagamento_profissional && (
           <TouchableOpacity style={[styles.btnConfirmar, { backgroundColor: '#FFA500' }]} onPress={() => atualizarStatus('pagamento_profissional', true)}>
@@ -147,6 +164,18 @@ export default function DetalhesAgendamentoProfissional() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* --- SEÇÃO DE INTERCORRÊNCIA --- */}
+      <View style={styles.intercorrenciaSection}>
+        <View style={styles.divider} />
+        <TouchableOpacity style={styles.btnIntercorrencia} onPress={abrirIntercorrencia}>
+          <Ionicons name="warning-outline" size={24} color="black" />
+          <Text style={styles.btnIntercorrenciaText}>Relatar Problema / Disputa</Text>
+        </TouchableOpacity>
+        <Text style={styles.helpText}>Use este canal caso o cliente não compareça ou haja divergência no pagamento.</Text>
+      </View>
+      
+      <View style={{ height: 50 }} />
     </ScrollView>
   );
 }
@@ -167,4 +196,19 @@ const styles = StyleSheet.create({
   btnConfirmar: { backgroundColor: '#00FF00', padding: 20, borderRadius: 5, alignItems: 'center', borderWidth: 1 },
   btnText: { fontSize: 18, fontWeight: 'bold', color: '#000' },
   divider: { height: 2, backgroundColor: '#000', width: '100%', marginVertical: 20 },
+  
+  // Estilos da Intercorrência
+  intercorrenciaSection: { padding: 20, alignItems: 'center' },
+  btnIntercorrencia: { 
+    flexDirection: 'row', 
+    backgroundColor: '#FF4444', 
+    padding: 15, 
+    borderRadius: 5, 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    width: '100%', 
+    justifyContent: 'center' 
+  },
+  btnIntercorrenciaText: { fontSize: 16, fontWeight: 'bold', color: '#000', marginLeft: 10 },
+  helpText: { fontSize: 12, color: '#EEE', textAlign: 'center', marginTop: 10, fontStyle: 'italic' }
 });
