@@ -2,20 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, FlatList, Image, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { supabase } from '../../services/api'; // Ajuste o caminho
+import { supabase } from '../../services/api'; 
 
 export default function VerificacaoProfissionais() {
   const router = useRouter();
   
-  // Estados de navegação interna
   const [viewMode, setViewMode] = useState('menu'); // 'menu', 'lista_docs', 'lista_pagos'
-  const [itemSelecionado, setItemSelecionado] = useState(null); // Para ver o detalhe (foto + botões)
-  
-  // Estados de dados
+  const [itemSelecionado, setItemSelecionado] = useState(null); 
   const [lista, setLista] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Carrega os dados sempre que mudar o modo de visualização
   useEffect(() => {
     if (viewMode !== 'menu') {
       fetchPendentes();
@@ -25,23 +21,26 @@ export default function VerificacaoProfissionais() {
   const fetchPendentes = async () => {
     setLoading(true);
     try {
+      // Buscamos as colunas necessárias de ambas as etapas
       let query = supabase.from('profissional').select(`
-        id_profissional, id_usuario, coren_url, comprovante_url, status_aprovacao,
+        id_profissional, id_usuario, coren_url, comprovante_url, status_aprovacao, status_pagamento,
         usuario:id_usuario ( nome_usuario )
       `);
 
       if (viewMode === 'lista_docs') {
-        // Busca quem tem COREN mas não está aprovado
+        // FILTRO DOCUMENTOS: Status aprovacao pendente E tem imagem do coren
         query = query.eq('status_aprovacao', 'pendente').not('coren_url', 'is', null);
       } else if (viewMode === 'lista_pagos') {
-        // Busca quem tem Comprovante mas não está aprovado
-        query = query.eq('status_aprovacao', 'pendente').not('comprovante_url', 'is', null);
+        // FILTRO PAGAMENTOS: Status pagamento pendente E tem imagem do comprovante
+        // IMPORTANTE: Aqui filtramos pela coluna status_pagamento!
+        query = query.eq('status_pagamento', 'pendente').not('comprovante_url', 'is', null);
       }
 
       const { data, error } = await query;
       if (error) throw error;
       setLista(data);
     } catch (error) {
+      console.error(error);
       Alert.alert("Erro", "Falha ao carregar dados.");
     } finally {
       setLoading(false);
@@ -50,22 +49,29 @@ export default function VerificacaoProfissionais() {
 
   const julgarStatus = async (status) => {
     try {
+      // Definimos qual coluna vamos atualizar baseado no modo que estamos
+      const colunaParaAtualizar = viewMode === 'lista_docs' ? 'status_aprovacao' : 'status_pagamento';
+      
+      const objetoUpdate = {};
+      objetoUpdate[colunaParaAtualizar] = status;
+
       const { error } = await supabase
         .from('profissional')
-        .update({ status_aprovacao: status })
+        .update(objetoUpdate)
         .eq('id_profissional', itemSelecionado.id_profissional);
 
       if (error) throw error;
 
-      Alert.alert("Sucesso", `O profissional foi ${status}!`);
+      Alert.alert("Sucesso", `${viewMode === 'lista_docs' ? 'Documento' : 'Pagamento'} foi ${status}!`);
       setItemSelecionado(null);
       fetchPendentes();
     } catch (error) {
+      console.error(error);
       Alert.alert("Erro", "Não foi possível atualizar o status.");
     }
   };
 
-  // --- RENDER 1: DETALHE (IMAGEM + BOTÕES) ---
+  // --- RENDER 1: DETALHE (FOTO + BOTÕES) ---
   if (itemSelecionado) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: '#8C8C8C' }]}>
@@ -75,7 +81,9 @@ export default function VerificacaoProfissionais() {
         
         <View style={styles.detailContent}>
           <Text style={styles.detailName}>{itemSelecionado.usuario?.nome_usuario}</Text>
-          <Text style={styles.detailSub}>{viewMode === 'lista_docs' ? 'Documento COREN:' : 'Comprovante PIX:'}</Text>
+          <Text style={styles.detailSub}>
+            {viewMode === 'lista_docs' ? 'Documento COREN:' : 'Comprovante PIX:'}
+          </Text>
           
           <Image 
             source={{ uri: viewMode === 'lista_docs' ? itemSelecionado.coren_url : itemSelecionado.comprovante_url }} 
@@ -161,13 +169,9 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'center', gap: 30 },
   squareButton: { width: 150, height: 150, backgroundColor: '#7a7a7a', justifyContent: 'center', alignItems: 'center' },
   buttonText: { color: '#000', fontSize: 18, marginTop: 5 },
-  
-  // Estilos da Lista
   nameCard: { backgroundColor: '#7a7a7a', padding: 20, marginBottom: 15, alignItems: 'center' },
   nameText: { fontSize: 18, fontWeight: 'bold', color: '#000' },
   emptyText: { textAlign: 'center', marginTop: 50, color: '#888' },
-
-  // Estilos do Detalhe
   detailContent: { flex: 1, alignItems: 'center', padding: 20 },
   detailName: { fontSize: 24, fontWeight: 'bold', marginBottom: 5 },
   detailSub: { fontSize: 18, marginBottom: 20 },

@@ -1,17 +1,15 @@
-
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-// Importamos a conexão com o banco
-import { supabase } from '../services/api'; 
+import { supabase } from '../services/api';
 
 export default function CadastroPasso3() {
   const router = useRouter();
-  const { tipo_conta, nome_usuario, senha } = useLocalSearchParams(); 
+  const { tipo_conta, nome_usuario, senha } = useLocalSearchParams();
 
   const [cidade, setCidade] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [loading, setLoading] = useState(false); // Para mostrar que está salvando
+  const [loading, setLoading] = useState(false);
 
   const cidades = ['Mococa, SP'];
 
@@ -21,56 +19,103 @@ export default function CadastroPasso3() {
       return;
     }
 
-    if (tipo_conta === 'profissional') {
-      // Profissional: Apenas passa os dados adiante para o passo 4
-      router.push({
-        pathname: '/cadastro_passo4',
-        params: { tipo_conta, nome_usuario, senha, cidade }
-      });
-    } else {
-      // CLIENTE: FINALIZAR E SALVAR NO SUPABASE
-      setLoading(true);
-      try {
-        const { error } = await supabase
-          .from('usuario')
-          .insert([
-            { 
-              nome_usuario: nome_usuario, 
-              senha: senha, 
-              tipo_conta: 'cliente', 
-              cidade: cidade,
-              status_conta: 'ativa' 
-            }
-          ]);
+    setLoading(true);
+    try {
+      let idUsuarioGerado;
 
-        if (error) {
-          // Se o erro for de 'Unique', avisamos que o usuário já existe
-          if (error.code === '23505') {
-            Alert.alert("Erro", "Este nome de usuário já está em uso.");
+      // 1. TENTA CRIAR O USUÁRIO
+      const { data: novoUsuario, error: errorUser } = await supabase
+        .from('usuario')
+        .insert([{ 
+          nome_usuario, 
+          senha, 
+          tipo_conta, 
+          cidade, 
+          status_conta: tipo_conta === 'profissional' ? 'pendente' : 'ativa' 
+        }])
+        .select()
+        .single();
+
+      if (errorUser) {
+        // SE O ERRO FOR "JÁ EXISTE" (Código 23505), RECUPERAMOS O ID
+        if (errorUser.code === '23505') {
+          const { data: usuarioExistente, error: errorBusca } = await supabase
+            .from('usuario')
+            .select('id_usuario')
+            .eq('nome_usuario', nome_usuario)
+            .single();
+          
+          if (usuarioExistente) {
+            idUsuarioGerado = usuarioExistente.id_usuario;
           } else {
-            Alert.alert("Erro", "Não foi possível realizar o cadastro.");
+            throw new Error("Usuário já existe, mas houve um erro ao recuperar os dados.");
           }
-          return;
+        } else {
+          throw errorUser;
+        }
+      } else {
+        idUsuarioGerado = novoUsuario.id_usuario;
+      }
+
+      // 2. LÓGICA ESPECÍFICA PARA PROFISSIONAL
+      if (tipo_conta === 'profissional') {
+        // Verifica se já existe uma linha na tabela profissional para este usuário
+        const { data: profExistente } = await supabase
+          .from('profissional')
+          .select('id_profissional')
+          .eq('id_usuario', idUsuarioGerado)
+          .single();
+
+        let idProfissional;
+
+        if (!profExistente) {
+          // Se não existe o registro profissional, cria agora
+          const { data: novoProf, error: errorProf } = await supabase
+            .from('profissional')
+            .insert([{ 
+              id_usuario: idUsuarioGerado,
+              status_aprovacao: 'pendente',
+              status_pagamento: 'pendente'
+            }])
+            .select()
+            .single();
+
+          if (errorProf) throw errorProf;
+          idProfissional = novoProf.id_profissional;
+        } else {
+          idProfissional = profExistente.id_profissional;
         }
 
+        // Navega para o passo 4 levando os IDs necessários
+        router.push({
+          pathname: '/cadastro_passo4',
+          params: { 
+            tipo_conta, 
+            id_usuario: String(idUsuarioGerado), 
+            id_profissional: String(idProfissional),
+            cidade 
+          }
+        });
+
+      } else {
+        // SE FOR CLIENTE, FINALIZA AQUI
         Alert.alert(
-          "Sucesso!", 
+          "Sucesso!",
           "Cadastro realizado com sucesso!",
           [{ text: "OK", onPress: () => router.replace('/login') }]
         );
-
-      } catch (err) {
-        Alert.alert("Erro", "Erro ao conectar com o servidor.");
-      } finally {
-        setLoading(false);
       }
+    } catch (err: any) {
+      console.error(err);
+      Alert.alert("Erro", "Ocorreu um problema: " + (err.message || "Erro de conexão."));
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.form}>
-        
         <Text style={styles.stepText}>
           {tipo_conta === 'profissional' ? 'Passo 3/5' : 'Passo 3/3'}
         </Text>
@@ -78,24 +123,24 @@ export default function CadastroPasso3() {
         <Text style={styles.label}>Selecione sua Cidade</Text>
         
         <View style={styles.dropdownContainer}>
-          <TouchableOpacity 
-            style={styles.dropdownHeader} 
+          <TouchableOpacity
+            style={styles.dropdownHeader}
             onPress={() => setShowDropdown(!showDropdown)}
             disabled={loading}
           >
             <Text style={styles.inputText}>{cidade || "Clique para selecionar"}</Text>
-            <Text style={styles.arrow}>{showDropdown ? '↑' : '↓'}</Text> 
-          </TouchableOpacity> 
+            <Text style={styles.arrow}>{showDropdown ? '↑' : '↓'}</Text>
+          </TouchableOpacity>
 
           {showDropdown && (
             <View style={styles.dropdownOptions}>
               {cidades.map((item) => (
-                <TouchableOpacity 
-                  key={item} 
-                  style={styles.option} 
+                <TouchableOpacity
+                  key={item}
+                  style={styles.option}
                   onPress={() => { 
-                    setCidade(item); 
-                    setShowDropdown(false); 
+                    setCidade(item);
+                    setShowDropdown(false);
                   }}
                 >
                   <Text style={styles.optionText}>{item}</Text>
@@ -105,10 +150,10 @@ export default function CadastroPasso3() {
           )}
         </View>
 
-        <TouchableOpacity 
-            style={[styles.nextButton, loading && { opacity: 0.7 }]} 
-            onPress={handleNext}
-            disabled={loading}
+        <TouchableOpacity
+          style={[styles.nextButton, loading && { opacity: 0.7 }]}
+          onPress={handleNext}
+          disabled={loading}
         >
           {loading ? (
             <ActivityIndicator color="#000" />
@@ -120,17 +165,15 @@ export default function CadastroPasso3() {
         </TouchableOpacity>
 
         {!loading && (
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                <Text style={styles.backButtonText}>Voltar</Text>
-            </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Text style={styles.backButtonText}>Voltar</Text>
+          </TouchableOpacity>
         )}
-
       </View>
     </SafeAreaView>
   );
 }
 
-// ... Estilos permanecem os mesmos ...
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   form: { flex: 1, paddingHorizontal: 40, alignItems: 'center', paddingTop: 80 },

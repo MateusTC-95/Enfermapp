@@ -2,50 +2,54 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Image, Alert } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../services/api'; 
+import { supabase } from '../services/api';
 
 export default function CadastroPasso4() {
   const router = useRouter();
-  const params = useLocalSearchParams(); 
+  const params = useLocalSearchParams();
   
   const [image, setImage] = useState(null);
   const [isWaiting, setIsWaiting] = useState(false);
-  const [isUploading, setIsUploading] = useState(false); 
+  const [isUploading, setIsUploading] = useState(false);
   const [urlFinal, setUrlFinal] = useState(null);
-  const [documentoAprovado, setDocumentoAprovado] = useState(false); // Novo estado para Realtime
+  const [documentoAprovado, setDocumentoAprovado] = useState(false);
 
-  // --- ESCUTAR APROVAÇÃO EM TEMPO REAL ---
   useEffect(() => {
+    // Só inicia a escuta se estivermos esperando e tivermos o ID do profissional
     if (isWaiting && params.id_profissional) {
-      const subscription = supabase
+      console.log("Iniciando escuta para o profissional:", params.id_profissional);
+
+      const channel = supabase
         .channel('check_aprovacao')
         .on(
           'postgres_changes',
           { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'profissional', 
-            filter: `id_profissional=eq.${params.id_profissional}` 
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profissional',
+            filter: `id_profissional=eq.${params.id_profissional}`
           },
           (payload) => {
-            if (payload.new.status_coren === 'aprovado') {
+            console.log("Mudança detectada no banco:", payload.new.status_aprovacao);
+            if (payload.new.status_aprovacao === 'aprovado') {
               setDocumentoAprovado(true);
             }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log("Status da conexão Realtime:", status);
+        });
 
       return () => {
-        supabase.removeChannel(subscription);
+        supabase.removeChannel(channel);
       };
     }
-  }, [isWaiting]);
+  }, [isWaiting, params.id_profissional]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
     if (status !== 'granted') {
-      Alert.alert("Permissão Necessária", "Precisamos de acesso às suas fotos para validar seu registro.");
+      Alert.alert("Permissão Necessária", "Precisamos de acesso às suas fotos.");
       return;
     }
 
@@ -63,30 +67,22 @@ export default function CadastroPasso4() {
 
   const handleSend = async () => {
     if (!image) {
-      Alert.alert("Aviso", "Por favor, anexe a imagem do seu COREN para continuar.");
+      Alert.alert("Aviso", "Por favor, anexe a imagem do seu COREN.");
       return;
     }
 
     try {
       setIsUploading(true);
-
-      const uri = image;
-      const response = await fetch(uri);
+      const response = await fetch(image);
       const arrayBuffer = await response.arrayBuffer();
-      
       const fileName = `coren_${Date.now()}.jpg`;
 
-      // Upload para o Storage
-      const { data, error } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('documentos_profissionais')
-        .upload(fileName, arrayBuffer, {
-          contentType: 'image/jpeg',
-          upsert: true
-        });
+        .upload(fileName, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
 
-      if (error) throw error;
+      if (uploadError) throw uploadError;
 
-      // Pegar a URL pública
       const { data: publicData } = supabase.storage
         .from('documentos_profissionais')
         .getPublicUrl(fileName);
@@ -94,23 +90,26 @@ export default function CadastroPasso4() {
       const url = publicData.publicUrl;
       setUrlFinal(url);
 
-      // Atualiza a tabela profissional com a URL e status pendente
-      await supabase
+      // ATUALIZA O PROFISSIONAL
+      const { error: updateError } = await supabase
         .from('profissional')
-        .update({ url_coren: url, status_coren: 'pendente' })
+        .update({ 
+          coren_url: url, 
+          status_aprovacao: 'pendente' 
+        })
         .eq('id_profissional', params.id_profissional);
 
-      setIsWaiting(true); // Ativa a tela de espera
+      if (updateError) throw updateError;
 
+      setIsWaiting(true);
     } catch (error) {
-      console.error("ERRO DETALHADO:", error);
-      Alert.alert("Erro no Upload", "Não conseguimos salvar a foto. Verifique sua conexão.");
+      console.error(error);
+      Alert.alert("Erro", "Não conseguimos salvar a foto.");
     } finally {
       setIsUploading(false);
     }
   };
 
-  // --- TELA DE ESPERA (Aparece após o envio, aguardando Admin) ---
   if (isWaiting) {
     return (
       <SafeAreaView style={styles.container}>
@@ -122,18 +121,24 @@ export default function CadastroPasso4() {
                 <ActivityIndicator size={80} color="#00ff00" style={{ marginBottom: 30 }} />
                 <Text style={styles.instructionText}>Aguardando Aprovação...</Text>
                 <Text style={{ fontSize: 16, color: '#8b8682', textAlign: 'center', marginBottom: 30 }}>
-                  Nossos admins estão revisando seu documento. Isso não costuma demorar.
+                  Nossos admins estão revisando seu documento.
                 </Text>
+                {/* Botão de teste caso o Realtime falhe */}
+                <TouchableOpacity 
+                  onPress={async () => {
+                    const { data } = await supabase.from('profissional').select('status_aprovacao').eq('id_profissional', params.id_profissional).single();
+                    if (data?.status_aprovacao === 'aprovado') setDocumentoAprovado(true);
+                  }}
+                  style={{ marginTop: 20 }}
+                >
+                  <Text style={{ color: '#ccc' }}>Verificar manualmente</Text>
+                </TouchableOpacity>
               </>
             ) : (
               <>
                 <Text style={{ fontSize: 60, marginBottom: 20 }}>✅</Text>
                 <Text style={styles.instructionText}>Documento Aprovado!</Text>
-                <Text style={{ fontSize: 16, color: '#8b8682', textAlign: 'center', marginBottom: 30 }}>
-                  Sua carteira do COREN foi validada com sucesso.
-                </Text>
-
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.nextButton, { backgroundColor: '#00ff00' }]} 
                   onPress={() => router.push({
                     pathname: '/cadastro_passo5',
@@ -155,45 +160,33 @@ export default function CadastroPasso4() {
       <View style={styles.form}>
         <Text style={styles.stepText}>Passo 4/5</Text>
         <Text style={styles.instructionText}>Anexe a Imagem da Sua Carteirinha do COREN</Text>
-
         <View style={styles.imageViewer}>
           <View style={styles.placeholderBox}>
-             {image ? (
-               <Image source={{ uri: image }} style={styles.previewImage} />
-             ) : (
-               <View style={styles.mountainIcon} />
-             )}
+            {image ? (
+              <Image source={{ uri: image }} style={styles.previewImage} />
+            ) : (
+              <View style={styles.mountainIcon} />
+            )}
           </View>
-          
-          <TouchableOpacity 
-            style={styles.attachButton} 
-            onPress={pickImage}
-            disabled={isUploading}
-          >
-            <Text style={styles.attachButtonText}>
-                {image ? "Trocar Imagem 📸" : "Anexar Imagem"}
-            </Text>
+          <TouchableOpacity style={styles.attachButton} onPress={pickImage} disabled={isUploading}>
+            <Text style={styles.attachButtonText}>{image ? "Trocar Imagem📸" : "Anexar Imagem"}</Text>
           </TouchableOpacity>
         </View>
 
-        <TouchableOpacity 
-            style={[styles.nextButton, { opacity: isUploading ? 0.7 : 1 }]} 
-            onPress={handleSend}
-            disabled={isUploading}
-        >
+        <TouchableOpacity style={[styles.nextButton, { opacity: isUploading ? 0.7 : 1 }]} onPress={handleSend} disabled={isUploading}>
           {isUploading ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <ActivityIndicator color="#000" style={{ marginRight: 10 }} />
-                <Text style={styles.nextButtonText}>ENVIANDO...</Text>
-              </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <ActivityIndicator color="#000" style={{ marginRight: 10 }} />
+              <Text style={styles.nextButtonText}>ENVIANDO...</Text>
+            </View>
           ) : (
-              <Text style={styles.nextButtonText}>ENVIAR DOCUMENTO</Text>
+            <Text style={styles.nextButtonText}>ENVIAR DOCUMENTO</Text>
           )}
         </TouchableOpacity>
 
         {!isUploading && (
-          <TouchableOpacity onPress={() => router.back()} style={{marginTop: 20}}>
-            <Text style={{color: '#8b8682'}}>Voltar</Text>
+          <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
+            <Text style={{ color: '#8b8682' }}>Voltar</Text>
           </TouchableOpacity>
         )}
       </View>

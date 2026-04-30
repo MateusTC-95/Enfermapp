@@ -2,29 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, ScrollView, Image } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../services/api'; 
+import { supabase } from '../services/api';
 
 export default function TelaPagamento() {
   const params = useLocalSearchParams();
   const router = useRouter();
   
-  const [status, setStatus] = useState('upload'); 
+  const [status, setStatus] = useState('upload');
   const [comprovanteUri, setComprovanteUri] = useState(null);
-  const [userIdGerado, setUserIdGerado] = useState(null);
   const [pagamentoAprovado, setPagamentoAprovado] = useState(false);
 
-  // --- MONITORAMENTO REALTIME DA APROVAÇÃO DO PAGAMENTO ---
   useEffect(() => {
-    if (status === 'concluido' && userIdGerado) {
+    if (status === 'concluido' && params.id_usuario) {
       const subscription = supabase
         .channel('check_pagamento')
         .on(
           'postgres_changes',
           { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'profissional', 
-            filter: `id_usuario=eq.${userIdGerado}` 
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profissional',
+            filter: `id_usuario=eq.${params.id_usuario}`
           },
           (payload) => {
             if (payload.new.status_pagamento === 'aprovado') {
@@ -38,7 +36,7 @@ export default function TelaPagamento() {
         supabase.removeChannel(subscription);
       };
     }
-  }, [status, userIdGerado]);
+  }, [status]);
 
   const selecionarComprovante = async () => {
     try {
@@ -47,7 +45,6 @@ export default function TelaPagamento() {
         allowsEditing: true,
         quality: 0.5,
       });
-
       if (!result.canceled) {
         setComprovanteUri(result.assets[0].uri);
       }
@@ -76,51 +73,23 @@ export default function TelaPagamento() {
 
       if (storageError) throw storageError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('comprovantes').getPublicUrl(fileName);
+      const { data: { publicUrl } } = supabase.storage.from('comprovantes').getPublicUrl(fileName);
 
-      // 2. CRIAR USUÁRIO
-      const { data: novoUsuario, error: erroUsuario } = await supabase
-        .from('usuario')
-        .insert([{ 
-          nome_usuario: params.nome_usuario, 
-          senha: params.senha, 
-          tipo_conta: 'profissional', 
-          cidade: params.cidade,
-          status_conta: 'pendente' 
-        }])
-        .select() 
-        .single();
-
-      if (erroUsuario) {
-        if (erroUsuario.code === '23505') {
-          throw new Error("Este nome de usuário já existe. Por favor, volte e escolha outro.");
-        }
-        throw erroUsuario;
-      }
-
-      const idCriado = novoUsuario.id_usuario || novoUsuario.id; 
-      setUserIdGerado(idCriado);
-
-      // 3. CRIAR PROFISSIONAL (Status inicial como pendente)
+      // 2. ATUALIZA PROFISSIONAL (O usuário já foi criado no Passo 3)
       const { error: erroProfissional } = await supabase
         .from('profissional')
-        .insert([{ 
-          id_usuario: idCriado, 
-          plano: params.planoId, 
-          status_aprovacao: 'pendente',
-          status_pagamento: 'pendente', // Garante que comece pendente
-          url_comprovante_pix: publicUrl, // Corrigido para bater com a tabela
-          coren_url: params.coren_url,
-          descricao: "" 
-        }]);
+        .update({
+          plano: params.planoId,
+          status_pagamento: 'pendente',
+          comprovante_url: publicUrl
+        })
+        .eq('id_usuario', params.id_usuario);
 
       if (erroProfissional) throw erroProfissional;
 
       setStatus('concluido');
 
     } catch (error) {
-      console.error("Erro no processo:", error);
       Alert.alert("Erro no Cadastro", error.message);
       setStatus('upload');
     }
@@ -134,7 +103,6 @@ export default function TelaPagamento() {
             <>
               <ActivityIndicator size="large" color="#00ff00" />
               <Text style={styles.tituloSucesso}>Processando Cadastro...</Text>
-              <Text style={styles.subtituloSucesso}>Criando sua conta e vinculando seus documentos...</Text>
             </>
           ) : (
             <>
@@ -142,24 +110,18 @@ export default function TelaPagamento() {
                 <>
                   <ActivityIndicator size={60} color="#00ff00" style={{ marginBottom: 20 }} />
                   <Text style={styles.tituloSucesso}>Aguardando Aprovação do PIX</Text>
-                  <Text style={styles.subtituloSucesso}>
-                    Recebemos seu comprovante! Um administrador irá validar o pagamento para liberar seu acesso.
-                  </Text>
+                  <Text style={styles.subtituloSucesso}>Recebemos seu comprovante! Um administrador irá validar.</Text>
                 </>
               ) : (
                 <>
                   <Text style={styles.emoji}>✅</Text>
                   <Text style={styles.tituloSucesso}>Pagamento Confirmado!</Text>
-                  <Text style={styles.subtituloSucesso}>Sua conta foi liberada. Vamos para o último passo.</Text>
-                  
                   <TouchableOpacity 
-                    style={styles.botaoProximo} 
-                    onPress={() => {
-                      router.push({
-                        pathname: '/cadastro_passo6', 
-                        params: { id_usuario: String(userIdGerado) } 
-                      });
-                    }}
+                    style={styles.botaoProximo}
+                    onPress={() => router.push({
+                      pathname: '/cadastro_passo6',
+                      params: { id_usuario: String(params.id_usuario) }
+                    })}
                   >
                     <Text style={styles.botaoTextoProximo}>CONFIGURAÇÕES FINAIS ➔</Text>
                   </TouchableOpacity>
@@ -177,7 +139,6 @@ export default function TelaPagamento() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.stepText}>Passo 5/5</Text>
         <Text style={styles.mainTitle}>Efetue o pagamento e envie o comprovante</Text>
-
         <View style={styles.pixCard}>
           <View style={styles.pixHeader}><Text style={styles.pixHeaderText}>pix</Text></View>
           <View style={styles.pixBody}>
@@ -185,20 +146,11 @@ export default function TelaPagamento() {
             <Text style={styles.pixValue}>enfermapp@gmail.com</Text>
           </View>
         </View>
-
         <View style={styles.comprovanteSection}>
-           <TouchableOpacity 
-              style={[styles.uploadBox, comprovanteUri ? styles.uploadBoxActive : null]} 
-              onPress={selecionarComprovante}
-           >
-              {comprovanteUri ? (
-                <Image source={{ uri: comprovanteUri }} style={styles.previewImagem} />
-              ) : (
-                <Text style={styles.uploadText}>Selecionar Comprovante PIX</Text>
-              )}
-           </TouchableOpacity>
+          <TouchableOpacity style={[styles.uploadBox, comprovanteUri ? styles.uploadBoxActive : null]} onPress={selecionarComprovante}>
+            {comprovanteUri ? <Image source={{ uri: comprovanteUri }} style={styles.previewImagem} /> : <Text style={styles.uploadText}>Selecionar Comprovante PIX</Text>}
+          </TouchableOpacity>
         </View>
-
         <TouchableOpacity style={styles.botaoFinalizar} onPress={finalizarPagamento}>
           <Text style={styles.botaoTexto}>CONCLUIR CADASTRO</Text>
         </TouchableOpacity>
