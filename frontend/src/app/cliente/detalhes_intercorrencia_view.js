@@ -6,7 +6,6 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../../services/api';
 
-// Paleta de cores premium unificada para o app
 const CREAM = '#FDFBF7';        
 const VERDE_VIVO = '#2E6F40';   
 const PETROLEO = '#0F262E';     
@@ -43,10 +42,10 @@ export default function DetalhesIntercorrenciaCliente() {
           agendamentos!inner (
             id_agendamento,
             servico:id_servico ( nome_servico ),
-            profissional:id_profissional ( usuario:id_usuario ( nome_usuario ) )
+            professional:id_profissional ( usuario:id_usuario ( nome_usuario ) )
           )
         `)
-        .eq('id_agendamento', id) 
+        .eq('id_agendamento', Number(id)) 
         .single();
 
       if (error) {
@@ -55,7 +54,15 @@ export default function DetalhesIntercorrenciaCliente() {
       }
       
       setData(data);
-      if (data?.descricao_cliente) setComentario(data.descricao_cliente);
+
+      // INTELIGÊNCIA DE COLUNA: Descobre se o cliente é o Reclamante ou a Defesa
+      const souReclamante = data?.aberta_por === 'cliente';
+      
+      if (souReclamante) {
+        if (data?.descricao) setComentario(data.descricao);
+      } else {
+        if (data?.defesa_descricao) setComentario(data.defesa_descricao);
+      }
 
     } catch (error) {
       console.error("Erro Catch:", error);
@@ -81,7 +88,10 @@ export default function DetalhesIntercorrenciaCliente() {
 
     try {
       setEnviando(true);
-      let urlFinal = data?.imagem_url || null; 
+      const souReclamante = data?.aberta_por === 'cliente';
+      
+      // Define a imagem base dependendo do papel do cliente
+      let urlFinal = souReclamante ? (data?.imagem_url || null) : (data?.defesa_imagem_url || null); 
 
       if (imagemNova) {
         const response = await fetch(imagemNova);
@@ -101,17 +111,19 @@ export default function DetalhesIntercorrenciaCliente() {
         urlFinal = publicUrl.publicUrl;
       }
 
+      // Monta o payload dinamicamente para não misturar os dados na mesma linha
+      const dadosUpdate = souReclamante 
+        ? { descricao: comentario, imagem_url: urlFinal }
+        : { defesa_descricao: comentario, defesa_imagem_url: urlFinal };
+
       const { error } = await supabase
         .from('intercorrencia')
-        .update({ 
-          descricao_cliente: comentario,
-          imagem_url: urlFinal 
-        })
-        .eq('id_agendamento', id);
+        .update(dadosUpdate)
+        .eq('id_agendamento', Number(id));
 
       if (error) throw error;
 
-      Alert.alert("Sucesso", "Sua reclamação foi atualizada!");
+      Alert.alert("Sucesso", "Dados salvos com sucesso!");
       router.back();
     } catch (error) {
       console.error("Erro no Update:", error);
@@ -142,6 +154,7 @@ export default function DetalhesIntercorrenciaCliente() {
   }
 
   const resolvida = data?.status === 'resolvido';
+  const souReclamante = data?.aberta_por === 'cliente';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -153,8 +166,12 @@ export default function DetalhesIntercorrenciaCliente() {
           <Text style={styles.backButtonText}>Voltar</Text>
         </TouchableOpacity>
 
-        <Text style={styles.title}>Minha Reclamação</Text>
-        <Text style={styles.subtitle}>Gerencie os detalhes e acompanhe o status da disputa aberta.</Text>
+        <Text style={styles.title}>{souReclamante ? "Minha Reclamação" : "Responder Notificação"}</Text>
+        <Text style={styles.subtitle}>
+          {souReclamante 
+            ? "Gerencie os detalhes e acompanhe o status da disputa aberta." 
+            : "O profissional abriu uma ocorrência. Envie sua argumentação de defesa."}
+        </Text>
 
         {/* CARD INFORMATIVO DA RECLAMAÇÃO */}
         <View style={styles.cardInfo}>
@@ -165,7 +182,7 @@ export default function DetalhesIntercorrenciaCliente() {
           
           <View style={styles.infoLine}>
             <Text style={styles.label}>Profissional</Text>
-            <Text style={styles.value}>{data?.agendamentos?.profissional?.usuario?.nome_usuario}</Text>
+            <Text style={styles.value}>{data?.agendamentos?.professional?.usuario?.nome_usuario}</Text>
           </View>
 
           <View style={[styles.infoLine, { borderBottomWidth: 0, paddingBottom: 0 }]}>
@@ -178,21 +195,35 @@ export default function DetalhesIntercorrenciaCliente() {
           </View>
         </View>
 
-        {/* RESPOSTA DO PROFISSIONAL (SE EXISTIR) */}
-        {data?.descricao_profissional && (
+        {/* EXIBE A VERSÃO DO PROFISSIONAL APENAS SE ELE FOR O RECLAMANTE */}
+        {!souReclamante && data?.descricao && (
+          <View style={styles.sectionProfessional}>
+            <View style={styles.sectionHeaderRow}>
+              <Ionicons name="alert-circle-outline" size={18} color={RED} />
+              <Text style={[styles.sectionTitle, { color: RED }]}>Reclamação do Profissional</Text>
+            </View>
+            <Text style={styles.descricaoTxt}>{data.descricao}</Text>
+            {data?.imagem_url && (
+              <Image source={{ uri: data.imagem_url }} style={styles.imgDefesa} />
+            )}
+          </View>
+        )}
+
+        {/* EXIBE A DEFESA DO PROFISSIONAL SE O CLIENTE FOR O RECLAMANTE */}
+        {souReclamante && data?.defesa_descricao && (
           <View style={styles.sectionProfissional}>
             <View style={styles.sectionHeaderRow}>
               <Ionicons name="chatbubble-ellipses-outline" size={18} color={PETROLEO} />
               <Text style={styles.sectionTitle}>Resposta do Profissional</Text>
             </View>
-            <Text style={styles.descricaoTxt}>{data.descricao_profissional}</Text>
-            {data?.imagem_url_defesa && (
-              <Image source={{ uri: data.imagem_url_defesa }} style={styles.imgDefesa} />
+            <Text style={styles.descricaoTxt}>{data.defesa_descricao}</Text>
+            {data?.defesa_imagem_url && (
+              <Image source={{ uri: data.defesa_imagem_url }} style={styles.imgDefesa} />
             )}
           </View>
         )}
 
-        {/* DECISÃO FINAL DO ADMINISTRADOR (CASO RESOLVIDO) */}
+        {/* DECISÃO FINAL DO ADMINISTRADOR */}
         {resolvida && (
           <View style={styles.vereditoCard}>
             <View style={styles.sectionHeaderRow}>
@@ -203,15 +234,17 @@ export default function DetalhesIntercorrenciaCliente() {
           </View>
         )}
 
-        {/* DIVIDER VISUAL */}
         <View style={styles.divider} />
 
-        {/* ÁREA DA SUA RECLAMAÇÃO ORIGINAL */}
+        {/* ÁREA DE INPUT TEXTO DO CLIENTE */}
         <View style={styles.defesaArea}>
           <Text style={styles.subSectionTitle}>Categoria da Ocorrência</Text>
-          <Text style={styles.motivoTxt}>{data?.motivo_categoria}</Text>
+          <Text style={styles.motivoTxt}>{data?.motivo_categoria || "Geral"}</Text>
           
-          <Text style={[styles.subSectionTitle, { marginTop: 16 }]}>Seus Detalhes / Argumentação</Text>
+          <Text style={[styles.subSectionTitle, { marginTop: 16 }]}>
+            {souReclamante ? "Seus Detalhes / Argumentação" : "Sua Defesa contra a Ocorrência"}
+          </Text>
+          
           {!resolvida ? (
             <>
               <TextInput
@@ -222,6 +255,7 @@ export default function DetalhesIntercorrenciaCliente() {
                 onChangeText={setComentario}
                 placeholder="Descreva detalhadamente o ocorrido..."
                 placeholderTextColor="#A4B4AB"
+                color={PETROLEO}
               />
               <TouchableOpacity style={styles.btnFoto} onPress={selecionarImagem}>
                 <Ionicons name="camera-outline" size={18} color={PETROLEO} style={{ marginRight: 6 }} />
@@ -230,19 +264,24 @@ export default function DetalhesIntercorrenciaCliente() {
             </>
           ) : (
             <View style={styles.closedCommentBox}>
-              <Text style={styles.descricaoTxt}>{data?.descricao_cliente}</Text>
+              <Text style={styles.descricaoTxt}>
+                {souReclamante ? data?.descricao : data?.defesa_descricao}
+              </Text>
             </View>
           )}
 
-          {/* EXIBIÇÃO DE MÍDIA / ANEXO DE PROVA */}
-          {(imagemNova || data?.imagem_url) && (
+          {/* EXIBIÇÃO DA IMAGEM ATUAL DO CLIENTE */}
+          {(imagemNova || (souReclamante ? data?.imagem_url : data?.defesa_imagem_url)) && (
             <View style={styles.imagePreviewContainer}>
               <Text style={styles.imageLabel}>Evidência Anexada:</Text>
-              <Image source={{ uri: imagemNova || data?.imagem_url }} style={styles.miniImg} />
+              <Image 
+                source={{ uri: imagemNova || (souReclamante ? data?.imagem_url : data?.defesa_imagem_url) }} 
+                style={styles.miniImg} 
+              />
             </View>
           )}
 
-          {/* BOTÃO SALVAR ALTERAÇÃO DA INTERCORRÊNCIA */}
+          {/* BOTÃO SALVAR */}
           {!resolvida && (
             <TouchableOpacity 
               style={[styles.btnEnviar, enviando && { opacity: 0.7 }]} 
@@ -259,245 +298,41 @@ export default function DetalhesIntercorrenciaCliente() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: CREAM 
-  },
-  center: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    padding: 24,
-    backgroundColor: CREAM 
-  },
-  scrollContent: { 
-    paddingHorizontal: 24, 
-    paddingTop: 20,
-    paddingBottom: 40 
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-    gap: 4,
-  },
-  backButtonText: {
-    color: PETROLEO,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  title: { 
-    fontSize: 24, 
-    fontWeight: '700', 
-    color: PETROLEO,
-    letterSpacing: -0.5,
-    marginBottom: 6
-  },
-  subtitle: {
-    fontSize: 14,
-    color: TEXT_MID,
-    marginBottom: 24,
-  },
-  cardInfo: { 
-    backgroundColor: WHITE, 
-    padding: 18, 
-    borderRadius: 16, 
-    marginBottom: 20, 
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    shadowColor: PETROLEO,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.02,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  infoLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: 12,
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: CREAM
-  },
-  label: { 
-    fontSize: 13, 
-    color: TEXT_MID, 
-    fontWeight: '500' 
-  },
-  value: { 
-    fontWeight: '700', 
-    color: PETROLEO, 
-    fontSize: 14 
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8
-  },
-  sectionProfissional: { 
-    backgroundColor: WHITE, 
-    padding: 16, 
-    borderRadius: 14, 
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: BORDER
-  },
-  sectionTitle: { 
-    fontSize: 14, 
-    fontWeight: '700', 
-    color: PETROLEO 
-  },
-  subSectionTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: TEXT_MID,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8
-  },
-  motivoTxt: { 
-    fontSize: 16, 
-    fontWeight: '700', 
-    color: RED, 
-    marginBottom: 4 
-  },
-  descricaoTxt: { 
-    fontSize: 14, 
-    color: PETROLEO, 
-    lineHeight: 22,
-    fontWeight: '500'
-  },
-  imgDefesa: { 
-    width: '100%', 
-    height: 180, 
-    marginTop: 12, 
-    borderRadius: 10,
-    backgroundColor: CREAM 
-  },
-  divider: { 
-    height: 1, 
-    backgroundColor: BORDER, 
-    marginVertical: 12 
-  },
-  vereditoCard: { 
-    backgroundColor: '#EBF7EE', 
-    padding: 16, 
-    borderRadius: 14, 
-    borderWidth: 1,
-    borderColor: '#D4EDDA',
-    marginBottom: 16 
-  },
-  vereditoTitle: { 
-    fontWeight: '700', 
-    color: VERDE_VIVO,
-    fontSize: 14 
-  },
-  vereditoTxt: { 
-    fontSize: 14, 
-    color: PETROLEO, 
-    lineHeight: 20,
-    fontWeight: '500'
-  },
-  defesaArea: {
-    marginTop: 8
-  },
-  input: { 
-    backgroundColor: WHITE, 
-    padding: 14, 
-    borderRadius: 12, 
-    borderWidth: 1, 
-    borderColor: BORDER, 
-    textAlignVertical: 'top', 
-    fontSize: 15, 
-    minHeight: 110,
-    color: PETROLEO,
-    fontWeight: '500'
-  },
-  closedCommentBox: {
-    backgroundColor: WHITE,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: BORDER
-  },
-  btnFoto: { 
-    backgroundColor: WHITE, 
-    flexDirection: 'row', 
-    paddingVertical: 10, 
-    paddingHorizontal: 14,
-    borderRadius: 10, 
-    marginTop: 12, 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: BORDER,
-    alignSelf: 'flex-start'
-  },
-  btnFotoText: { 
-    color: PETROLEO, 
-    fontWeight: '600',
-    fontSize: 13 
-  },
-  imagePreviewContainer: {
-    marginTop: 20
-  },
-  imageLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: TEXT_MID,
-    marginBottom: 8
-  },
-  miniImg: { 
-    width: '100%', 
-    height: 220, 
-    borderRadius: 12, 
-    resizeMode: 'cover', 
-    backgroundColor: WHITE,
-    borderWidth: 1,
-    borderColor: BORDER
-  },
-  btnEnviar: { 
-    backgroundColor: VERDE_VIVO, 
-    paddingVertical: 15, 
-    borderRadius: 12, 
-    marginTop: 24, 
-    alignItems: 'center',
-    shadowColor: VERDE_VIVO,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  btnEnviarText: { 
-    color: WHITE, 
-    fontWeight: '600', 
-    fontSize: 16,
-    letterSpacing: 0.3
-  },
-  btnNotFoundBack: {
-    backgroundColor: PETROLEO,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 16
-  },
-  notFoundText: { 
-    fontSize: 15, 
-    color: TEXT_MID, 
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 8
-  }
+  container: { flex: 1, backgroundColor: CREAM },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, backgroundColor: CREAM },
+  scrollContent: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
+  backButton: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 4 },
+  backButtonText: { color: PETROLEO, fontSize: 16, fontWeight: '500' },
+  title: { fontSize: 24, fontWeight: '700', color: PETROLEO, letterSpacing: -0.5, marginBottom: 6 },
+  subtitle: { fontSize: 14, color: TEXT_MID, marginBottom: 24 },
+  cardInfo: { backgroundColor: WHITE, padding: 18, borderRadius: 16, marginBottom: 20, borderWidth: 1.5, borderColor: BORDER, shadowColor: PETROLEO, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.02, shadowRadius: 10, elevation: 2 },
+  infoLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 12, marginBottom: 12, borderBottomWidth: 1, borderBottomColor: CREAM },
+  label: { fontSize: 13, color: TEXT_MID, fontWeight: '500' },
+  value: { fontWeight: '700', color: PETROLEO, fontSize: 14 },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
+  statusBadgeText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  sectionProfissional: { backgroundColor: WHITE, padding: 16, borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: BORDER },
+  sectionProfessional: { backgroundColor: '#FFF5F5', padding: 16, borderRadius: 14, marginBottom: 16, borderWidth: 1, borderColor: '#FEB2B2' },
+  sectionTitle: { fontSize: 14, fontWeight: '700', color: PETROLEO },
+  subSectionTitle: { fontSize: 12, fontWeight: '600', color: TEXT_MID, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  motivoTxt: { fontSize: 16, fontWeight: '700', color: RED, marginBottom: 4 },
+  descricaoTxt: { fontSize: 14, color: PETROLEO, lineHeight: 22, fontWeight: '500' },
+  imgDefesa: { width: '100%', height: 180, marginTop: 12, borderRadius: 10, backgroundColor: CREAM },
+  divider: { height: 1, backgroundColor: BORDER, marginVertical: 12 },
+  vereditoCard: { backgroundColor: '#EBF7EE', padding: 16, borderRadius: 14, borderWidth: 1, borderColor: '#D4EDDA', marginBottom: 16 },
+  vereditoTitle: { fontWeight: '700', color: VERDE_VIVO, fontSize: 14 },
+  vereditoTxt: { fontSize: 14, color: PETROLEO, lineHeight: 20, fontWeight: '500' },
+  defesaArea: { marginTop: 8 },
+  input: { backgroundColor: WHITE, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: BORDER, textAlignVertical: 'top', fontSize: 15, minHeight: 110, color: PETROLEO, fontWeight: '500' },
+  closedCommentBox: { backgroundColor: WHITE, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: BORDER },
+  btnFoto: { backgroundColor: WHITE, flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, marginTop: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: BORDER, alignSelf: 'flex-start' },
+  btnFotoText: { color: PETROLEO, fontWeight: '600', fontSize: 13 },
+  imagePreviewContainer: { marginTop: 20 },
+  imageLabel: { fontSize: 12, fontWeight: '600', color: TEXT_MID, marginBottom: 8 },
+  miniImg: { width: '100%', height: 220, borderRadius: 12, resizeMode: 'cover', backgroundColor: WHITE, borderWidth: 1, borderColor: BORDER },
+  btnEnviar: { backgroundColor: VERDE_VIVO, paddingVertical: 15, borderRadius: 12, marginTop: 24, alignItems: 'center', shadowColor: VERDE_VIVO, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3 },
+  btnEnviarText: { color: WHITE, fontWeight: '600', fontSize: 16, letterSpacing: 0.3 },
+  btnNotFoundBack: { backgroundColor: PETROLEO, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10, marginTop: 16 },
+  notFoundText: { fontSize: 15, color: TEXT_MID, textAlign: 'center', lineHeight: 22, marginBottom: 8 }
 });

@@ -1,3 +1,4 @@
+// DetalhesIntercorrenciasAdmin
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -11,7 +12,9 @@ export default function DetalhesIntercorrenciasAdmin() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDetalhes();
+    if (id) {
+      fetchDetalhes();
+    }
   }, [id]);
 
   const fetchDetalhes = async () => {
@@ -27,7 +30,7 @@ export default function DetalhesIntercorrenciasAdmin() {
             profissional:id_profissional ( id_usuario, advertencias, usuario:id_usuario ( nome_usuario ) )
           )
         `)
-        .eq('id_intercorrencia', id)
+        .eq('id_intercorrencia', Number(id))
         .single();
 
       if (error) throw error;
@@ -53,20 +56,61 @@ export default function DetalhesIntercorrenciasAdmin() {
         .update({ advertencias: novasAdvertencias })
         .eq('id_usuario', alvo.id_usuario);
 
-      // 2. Registra o veredito
-      await supabase
+      // 2. Registra o veredito salvando a data em formato ISO
+      const { data: updateData, error } = await supabase
         .from('intercorrencia')
         .update({ 
           status: 'resolvido', 
           veredito: `Advertência aplicada ao ${tipoAlvo}`,
-          encerrada_em: new Date() 
+          encerrada_em: new Date().toISOString() 
         })
-        .eq('id_intercorrencia', id);
+        .eq('id_intercorrencia', Number(id))
+        .select();
+
+      if (error) throw error;
+
+      if (!updateData || updateData.length === 0) {
+        Alert.alert("Aviso", "Nenhum registro foi alterado no banco de dados.");
+        return;
+      }
 
       Alert.alert("Sucesso", `Advertência aplicada com sucesso.`);
       router.back();
     } catch (error) {
+      console.error(error);
       Alert.alert("Erro", "Falha ao processar punição.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Função para encerrar o chamado sem punições (Inocentes)
+  const encerrarSemPunir = async () => {
+    try {
+      setLoading(true);
+      
+      const { data: updateData, error } = await supabase
+        .from('intercorrencia')
+        .update({ 
+          status: 'resolvido', 
+          veredito: 'Caso encerrado sem aplicação de penalidades.',
+          encerrada_em: new Date().toISOString() 
+        })
+        .eq('id_intercorrencia', Number(id))
+        .select();
+
+      if (error) throw error;
+
+      if (!updateData || updateData.length === 0) {
+        Alert.alert("Aviso", "O chamado não pôde ser fechado no banco de dados.");
+        return;
+      }
+
+      Alert.alert("Sucesso", "Chamado encerrado com sucesso.");
+      router.back();
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Erro", "Falha ao encerrar chamado.");
     } finally {
       setLoading(false);
     }
@@ -74,35 +118,35 @@ export default function DetalhesIntercorrenciasAdmin() {
 
   if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#000" /></View>;
 
-  // Variáveis auxiliares para descobrir quem é o reclamante com base no "aberta_por"
-  const ehClienteReclamante = data.aberta_por === 'cliente';
+  // Identifica quem abriu
+  const ehClienteReclamante = data?.aberta_por === 'cliente';
   
   const nomeReclamante = ehClienteReclamante 
-    ? data.agendamentos.cliente.nome_usuario 
-    : data.agendamentos.profissional.usuario.nome_usuario;
+    ? data?.agendamentos?.cliente?.nome_usuario 
+    : data?.agendamentos?.profissional?.usuario?.nome_usuario;
 
   const nomeDefesa = ehClienteReclamante 
-    ? data.agendamentos.profissional.usuario.nome_usuario 
-    : data.agendamentos.cliente.nome_usuario;
+    ? data?.agendamentos?.profissional?.usuario?.nome_usuario 
+    : data?.agendamentos?.cliente?.nome_usuario;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}><Ionicons name="chevron-back" size={35} color="black" /></TouchableOpacity>
-        <Text style={styles.headerTitle}>Julgamento #{data.id_intercorrencia}</Text>
+        <Text style={styles.headerTitle}>Julgamento #{data?.id_intercorrencia}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
-        {/* --- SEÇÃO DO RECLAMANTE (Quem abriu a ocorrência) --- */}
+        {/* --- SEÇÃO DO RECLAMANTE --- */}
         <View style={[styles.card, styles.cardReclamante]}>
           <Text style={styles.sectionTitle}>
-            Versão do Reclamante ({nomeReclamante} - {data.aberta_por?.toUpperCase()})
+            Versão do Reclamante ({nomeReclamante} - {data?.aberta_por?.toUpperCase()})
           </Text>
-          <Text style={styles.motivoTag}>{data.motivo_categoria || 'Não Especificado'}</Text>
-          <Text style={styles.descricaoTxt}>{data.descricao || "Sem descrição detalhada."}</Text>
+          <Text style={styles.motivoTag}>{data?.motivo_categoria || 'Não Especificado'}</Text>
+          <Text style={styles.descricaoTxt}>{data?.descricao || "Sem descrição detalhada."}</Text>
           
-          {data.imagem_url ? (
+          {data?.imagem_url ? (
             <Image source={{ uri: data.imagem_url }} style={styles.img} resizeMode="contain" />
           ) : (
             <Text style={styles.semProva}>Nenhuma foto enviada pelo reclamante.</Text>
@@ -111,17 +155,17 @@ export default function DetalhesIntercorrenciasAdmin() {
 
         <Ionicons name="swap-vertical" size={30} color="#ccc" style={{ marginVertical: 10 }} />
 
-        {/* --- SEÇÃO DA DEFESA (Quem responde à ocorrência) --- */}
+        {/* --- SEÇÃO DA DEFESA --- */}
         <View style={[styles.card, styles.cardDefesa]}>
           <Text style={styles.sectionTitle}>
             Defesa da Contraparte ({nomeDefesa} - {ehClienteReclamante ? 'PROFISSIONAL' : 'CLIENTE'})
           </Text>
           
-          {data.descricao_profissional ? (
+          {data?.defesa_descricao ? (
             <>
-              <Text style={styles.descricaoTxt}>{data.descricao_profissional}</Text>
-              {data.imagem_url_defesa ? (
-                <Image source={{ uri: data.imagem_url_defesa }} style={styles.img} resizeMode="contain" />
+              <Text style={styles.descricaoTxt}>{data.defesa_descricao}</Text>
+              {data?.defesa_imagem_url ? (
+                <Image source={{ uri: data.defesa_imagem_url }} style={styles.img} resizeMode="contain" />
               ) : (
                 <Text style={styles.semProva}>Não foram anexadas fotos na resposta de defesa.</Text>
               )}
@@ -140,7 +184,10 @@ export default function DetalhesIntercorrenciasAdmin() {
           
           <TouchableOpacity 
             style={[styles.actionBtn, {backgroundColor: '#2ecc71'}]}
-            onPress={() => Alert.alert("Encerrar", "Encerrar sem punir ninguém?", [{text: "Sim", onPress: () => router.back()}])}
+            onPress={() => Alert.alert("Encerrar", "Encerrar sem punir ninguém?", [
+              {text: "Cancelar", style: "cancel"},
+              {text: "Sim", onPress: encerrarSemPunir}
+            ])}
           >
             <Text style={styles.actionBtnText}>Encerrar Chamado (Inocentes)</Text>
           </TouchableOpacity>
@@ -149,14 +196,14 @@ export default function DetalhesIntercorrenciasAdmin() {
             style={[styles.actionBtn, {backgroundColor: '#e67e22'}]}
             onPress={() => handleAdvertencia('cliente')}
           >
-            <Text style={styles.actionBtnText}>Punir Cliente ({data.agendamentos.cliente.nome_usuario})</Text>
+            <Text style={styles.actionBtnText}>Punir Cliente ({data?.agendamentos?.cliente?.nome_usuario})</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={[styles.actionBtn, {backgroundColor: '#e74c3c'}]}
             onPress={() => handleAdvertencia('profissional')}
           >
-            <Text style={styles.actionBtnText}>Punir Profissional ({data.agendamentos.profissional.usuario.nome_usuario})</Text>
+            <Text style={styles.actionBtnText}>Punir Profissional ({data?.agendamentos?.profissional?.usuario?.nome_usuario})</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

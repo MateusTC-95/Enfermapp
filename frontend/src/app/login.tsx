@@ -1,4 +1,4 @@
- import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -71,7 +71,11 @@ export default function LoginScreen() {
         return;
       }
 
+      // CORREÇÃO CRÚCIAL: Limpa resíduos de id antigos e grava os dados da conta atualizada
+      await AsyncStorage.removeItem('id_usuario'); 
       await AsyncStorage.setItem('nome_logado', data.nome_usuario);
+      await AsyncStorage.setItem('id_usuario', String(data.id_usuario)); // <-- Salvando o ID correto do usuário (Ex: 167)
+
       router.replace(`/${tipoNormalizado}/dashboard` as any);
 
     } catch (error) {
@@ -277,217 +281,40 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: CREAM,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 28,
-    paddingTop: 40,
-    paddingBottom: 20,
-  },
-  titleSection: {
-    marginBottom: 35,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-    color: TEXT_DARK,
-    letterSpacing: -0.5,
-  },
-  titleAccent: {
-    fontSize: 34,
-    fontWeight: '300',
-    color: PETROLEO_VIVO,
-    letterSpacing: -0.5,
-  },
-  inputLabel: {
-    fontSize: 12,
-    color: OLIVA,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1.2,
-    marginBottom: 8,
-  },
-  fieldWrapper: {
-    marginBottom: 20,
-  },
-  inputBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: WHITE,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#D5D1C8',
-    height: 54,
-    paddingHorizontal: 16,
-    overflow: 'hidden', // Corta qualquer vazamento de fundo dos inputs nos cantos arredondados
-  },
-  inputBoxFocused: {
-    borderColor: PETROLEO,
-    shadowColor: PETROLEO,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  leadingIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: TEXT_DARK,
-    height: '100%',
-  },
-  eyeButton: {
-    height: '100%',
-    justifyContent: 'center',
-    paddingLeft: 8,
-  },
-  dropdown: {
-    backgroundColor: WHITE,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#D5D1C8',
-    height: 54,
-    justifyContent: 'center',
-  },
-  dropdownActive: {
-    borderColor: PETROLEO,
-    shadowColor: PETROLEO,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  dropdownSelected: {
-    borderColor: OLIVA,
-  },
-  dropdownContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  dropdownText: {
-    fontSize: 16,
-    color: TEXT_DARK,
-    fontWeight: '500',
-  },
-  dropdownPlaceholder: {
-    color: '#ABABAB',
-    fontWeight: '400',
-  },
-  arrowContainer: {
-    width: 26,
-    height: 26,
-    borderRadius: 6,
-    backgroundColor: PETROLEO_BG,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  optionsContainer: {
-    marginTop: 8,
-    backgroundColor: WHITE,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 6,
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0EDE8',
-  },
-  optionFirst: {
-    borderTopWidth: 0,
-  },
-  optionSelected: {
-    backgroundColor: OLIVA_BG,
-  },
-  optionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#F0EDE8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-  },
-  optionIconSelected: {
-    backgroundColor: PETROLEO_BG,
-  },
-  optionTextContainer: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: TEXT_DARK,
-    marginBottom: 2,
-  },
-  optionTitleSelected: {
-    color: PETROLEO,
-  },
-  optionDescription: {
-    fontSize: 12,
-    color: TEXT_MID,
-  },
-  checkmark: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: PETROLEO,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  footer: {
-    marginTop: 'auto',
-    paddingTop: 30,
-    paddingBottom: 20,
-  },
-  nextButton: { 
-    backgroundColor: PETROLEO,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 14,
-    shadowColor: PETROLEO,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  nextButtonDisabled: {
-    backgroundColor: BORDER,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  nextButtonText: { 
-    color: WHITE,
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  nextButtonTextDisabled: {
-    color: TEXT_MID,
-  },
-  hintText: {
-    textAlign: 'center',
-    marginTop: 14,
-    fontSize: 13,
-    color: OLIVA_VIVA,
-    fontWeight: '500',
-  },
+  container: { flex: 1, backgroundColor: CREAM },
+  scrollContent: { flexGrow: 1, paddingHorizontal: 28, paddingTop: 40, paddingBottom: 20 },
+  titleSection: { marginBottom: 35 },
+  title: { fontSize: 34, fontWeight: '700', color: TEXT_DARK, letterSpacing: -0.5 },
+  titleAccent: { fontSize: 34, fontWeight: '300', color: PETROLEO_VIVO, letterSpacing: -0.5 },
+  inputLabel: { fontSize: 12, color: OLIVA, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8 },
+  fieldWrapper: { marginBottom: 20 },
+  inputBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: WHITE, borderRadius: 12, borderWidth: 1.5, borderColor: '#D5D1C8', height: 54, paddingHorizontal: 16, overflow: 'hidden' },
+  inputBoxFocused: { borderColor: PETROLEO, shadowColor: PETROLEO, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 },
+  leadingIcon: { marginRight: 12 },
+  input: { flex: 1, fontSize: 16, color: TEXT_DARK, height: '100%' },
+  eyeButton: { height: '100%', justifyContent: 'center', paddingLeft: 8 },
+  dropdown: { backgroundColor: WHITE, borderRadius: 12, borderWidth: 1.5, borderColor: '#D5D1C8', height: 54, justifyContent: 'center' },
+  dropdownActive: { borderColor: PETROLEO, shadowColor: PETROLEO, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.1, shadowRadius: 5, elevation: 3 },
+  dropdownSelected: { borderColor: OLIVA },
+  dropdownContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 },
+  dropdownText: { fontSize: 16, color: TEXT_DARK, fontWeight: '500' },
+  dropdownPlaceholder: { color: '#ABABAB', fontWeight: '400' },
+  arrowContainer: { width: 26, height: 26, borderRadius: 6, backgroundColor: PETROLEO_BG, justifyContent: 'center', alignItems: 'center' },
+  optionsContainer: { marginTop: 8, backgroundColor: WHITE, borderRadius: 14, borderWidth: 1.5, borderColor: BORDER, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 6 },
+  option: { flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#F0EDE8' },
+  optionFirst: { borderTopWidth: 0 },
+  optionSelected: { backgroundColor: OLIVA_BG },
+  optionIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#F0EDE8', justifyContent: 'center', alignItems: 'center', marginRight: 14 },
+  optionIconSelected: { backgroundColor: PETROLEO_BG },
+  optionTextContainer: { flex: 1 },
+  optionTitle: { fontSize: 15, fontWeight: '600', color: TEXT_DARK, marginBottom: 2 },
+  optionTitleSelected: { color: PETROLEO },
+  optionDescription: { fontSize: 12, color: TEXT_MID },
+  checkmark: { width: 22, height: 22, borderRadius: 11, backgroundColor: PETROLEO, justifyContent: 'center', alignItems: 'center' },
+  footer: { marginTop: 'auto', paddingTop: 30, paddingBottom: 20 },
+  nextButton: { backgroundColor: PETROLEO, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 14, shadowColor: PETROLEO, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 },
+  nextButtonDisabled: { backgroundColor: BORDER, shadowOpacity: 0, elevation: 0 },
+  nextButtonText: { color: WHITE, fontSize: 15, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  nextButtonTextDisabled: { color: TEXT_MID },
+  hintText: { textAlign: 'center', marginTop: 14, fontSize: 13, color: OLIVA_VIVA, fontWeight: '500' },
 });

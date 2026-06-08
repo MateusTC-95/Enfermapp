@@ -12,7 +12,8 @@
     },
     "android": {
       "icon": "./assets/icon.jpg",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.tcc2026.enfermapp"
     },
     "web": {
       "output": "static",

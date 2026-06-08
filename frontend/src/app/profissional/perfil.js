@@ -37,10 +37,15 @@ export default function PerfilProfissional() {
   const buscarDados = async () => {
     try {
       setFetching(true);
-      const nomeSalvo = await AsyncStorage.getItem('nome_logado');
-      if (!nomeSalvo) { router.replace('/login'); return; }
+      
+      // Busca rigorosa pelo ID do usuário logado para evitar misturar perfis
+      const idUsuarioSalvo = await AsyncStorage.getItem('id_usuario');
+      if (!idUsuarioSalvo) { 
+        router.replace('/login'); 
+        return; 
+      }
 
-      // 1. Busca os dados principais do profissional e da tabela usuario relacionando pagamento_usado
+      // CORREÇÃO CIRÚRGICA: Filtrando explicitamente pelo ID correto da chave estrangeira
       const { data: prof, error: profError } = await supabase
         .from('profissional')
         .select(`
@@ -50,7 +55,7 @@ export default function PerfilProfissional() {
           total_avaliacoes,
           usuario!inner (id_usuario, nome_usuario, cidade, telefone, foto_perfil, advertencias, pagamento_usado)
         `)
-        .eq('usuario.nome_usuario', nomeSalvo)
+        .eq('usuario.id_usuario', idUsuarioSalvo) // <-- Aponta direto para o ID isolado da tabela usuario
         .maybeSingle();
 
       if (profError) throw profError;
@@ -58,14 +63,16 @@ export default function PerfilProfissional() {
       if (prof) {
         const idP = prof.id_profissional;
 
-        // 2. Busca apenas a tabela de horários (já que pagamento está na tabela usuario)
+        // 2. Busca a tabela de horários vinculada a este profissional específico
         const { data: resH, error: hError } = await supabase
           .from('horarios_profissional')
           .select('*')
           .eq('id_profissional', idP)
           .maybeSingle();
 
-        // 3. Monta o estado com os dados corretos mapeados do BD
+        if (hError) console.error("Erro ao buscar horários:", hError.message);
+
+        // 3. Monta o estado com os dados corretos e isolados do usuário logado
         setDados({
           nome_usuario: prof.usuario?.nome_usuario || 'Não informado',
           cidade: prof.usuario?.cidade || 'Não informada',
@@ -77,13 +84,20 @@ export default function PerfilProfissional() {
           advertencias: prof.usuario?.advertencias || 0, 
           horario: resH?.tipo_horario === 'flexivel' 
             ? 'Atendimento 24h (Sem hora fixa)' 
-            : (resH?.horario_inicio ? `${resH.horario_inicio.slice(0,5)} - ${resH.var_fim ? resH.horario_fim.slice(0,5) : resH.horario_fim?.slice(0,5)}` : 'Horário não definido'),
+            : (resH?.horario_inicio ? `${resH.horario_inicio.slice(0,5)} - ${resH.horario_fim?.slice(0,5)}` : 'Horário não definido'),
         });
         
-        if (prof.usuario?.foto_perfil) setFoto(prof.usuario.foto_perfil);
+        if (prof.usuario?.foto_perfil) {
+          setFoto(prof.usuario.foto_perfil);
+        } else {
+          setFoto(null);
+        }
+      } else {
+        Alert.alert("Erro", "Perfil profissional não encontrado para este usuário.");
       }
     } catch (error) {
       console.error("Erro ao carregar perfil profissional:", error.message);
+      Alert.alert("Erro", "Falha ao carregar os dados do seu perfil.");
     } finally {
       setFetching(false);
     }
@@ -112,8 +126,10 @@ export default function PerfilProfissional() {
   const uploadImagem = async (base64) => {
     try {
       setLoading(true);
-      const nomeSalvo = await AsyncStorage.getItem('nome_logado');
-      const fileName = `${nomeSalvo}-${Date.now()}.png`;
+      const idUsuarioSalvo = await AsyncStorage.getItem('id_usuario');
+      if (!idUsuarioSalvo) throw new Error("Usuário não identificado.");
+
+      const fileName = `avatar-${idUsuarioSalvo}-${Date.now()}.png`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
@@ -128,20 +144,24 @@ export default function PerfilProfissional() {
       const { error: updateError } = await supabase
         .from('usuario')
         .update({ foto_perfil: publicUrl })
-        .eq('nome_usuario', nomeSalvo);
+        .eq('id_usuario', idUsuarioSalvo);
 
       if (updateError) throw updateError;
 
       setFoto(publicUrl);
       Alert.alert("Sucesso", "Foto de perfil updated!");
     } catch (error) {
-      Alert.alert("Erro", error.message);
+      Alert.alert("Erro ao salvar imagem", error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  useFocusEffect(useCallback(() => { buscarDados(); }, []));
+  useFocusEffect(
+    useCallback(() => { 
+      buscarDados(); 
+    }, [])
+  );
 
   if (fetching) {
     return (
@@ -242,7 +262,7 @@ export default function PerfilProfissional() {
 
           {/* SUBSECÇÃO DE PAGAMENTO */}
           <View style={styles.subSection}>
-            <Text style={styles.subTitle}>Forma de Recebimento Principal</Text>
+            <Text style={styles.subTitle}>Formas de Recebimento Aceitas</Text>
             <View style={styles.badgePagamento}>
               <Ionicons name="card" size={16} color={PETROLEO} />
               <Text style={styles.infoValueBold}>
@@ -273,195 +293,32 @@ export default function PerfilProfissional() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: CREAM 
-  },
-  center: { 
-    flex: 1, 
-    backgroundColor: CREAM, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-  scrollContent: { 
-    paddingHorizontal: 24, 
-    paddingTop: 20,
-    paddingBottom: 40 
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-    gap: 4,
-  },
-  backButtonText: {
-    color: PETROLEO,
-    fontSize: 15,
-    fontWeight: '500',
-  },
-  headerCard: { 
-    flexDirection: 'row', 
-    alignItems: 'center',
-    marginBottom: 28,
-  },
-  avatarCircle: { 
-    width: 74, 
-    height: 74, 
-    borderRadius: 37, 
-    backgroundColor: PETROLEO, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    borderWidth: 1.5, 
-    borderColor: BORDER, 
-    position: 'relative'
-  },
-  avatarCircleFilled: {
-    borderColor: VERDE_VIVO,
-    borderWidth: 2,
-  },
-  fotoAvatar: { 
-    width: '100%', 
-    height: '100%',
-    borderRadius: 37 
-  },
-  editBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: VERDE_VIVO,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: CREAM
-  },
-  userInfo: { 
-    marginLeft: 16,
-    flex: 1
-  },
-  name: { 
-    fontSize: 22, 
-    fontWeight: '700', 
-    color: PETROLEO,
-    letterSpacing: -0.5
-  },
-  avisoText: { 
-    fontSize: 13, 
-    color: VERDE_VIVO,
-    marginTop: 2,
-    fontWeight: '700'
-  },
-  cardDetails: {
-    backgroundColor: WHITE,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    shadowColor: PETROLEO,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  sectionTitle: { 
-    fontSize: 16, 
-    fontWeight: '700', 
-    color: PETROLEO, 
-    marginBottom: 20,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase'
-  },
-  infoRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 16 
-  },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: CREAM,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12
-  },
-  textContainer: {
-    flex: 1
-  },
-  infoLabel: { 
-    fontSize: 11, 
-    color: TEXT_MID,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    fontWeight: '600'
-  },
-  infoValue: { 
-    fontSize: 15,
-    color: PETROLEO,
-    fontWeight: '500',
-    marginTop: 1
-  },
-  subSection: { 
-    marginTop: 8,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: BORDER
-  },
-  subTitle: { 
-    fontSize: 11, 
-    fontWeight: '600', 
-    marginBottom: 8, 
-    color: TEXT_MID,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  },
-  badgePagamento: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: CREAM,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-    gap: 6
-  },
-  infoValueBold: { 
-    fontWeight: '700', 
-    fontSize: 13, 
-    color: PETROLEO 
-  },
-  descricaoBox: {
-    backgroundColor: CREAM,
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 2
-  },
-  descricaoText: { 
-    fontSize: 14, 
-    color: PETROLEO, 
-    fontStyle: 'italic', 
-    lineHeight: 20 
-  },
-  button: { 
-    backgroundColor: VERDE_VIVO, 
-    paddingVertical: 14, 
-    borderRadius: 12, 
-    marginTop: 24, 
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    shadowColor: VERDE_VIVO,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  buttonText: { 
-    fontSize: 16, 
-    color: WHITE, 
-    fontWeight: '600',
-    letterSpacing: 0.3
-  },
+  container: { flex: 1, backgroundColor: CREAM },
+  center: { flex: 1, backgroundColor: CREAM, justifyContent: 'center', alignItems: 'center' },
+  scrollContent: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
+  backButton: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 4 },
+  backButtonText: { color: PETROLEO, fontSize: 15, fontWeight: '500' },
+  headerCard: { flexDirection: 'row', alignItems: 'center', marginBottom: 28 },
+  avatarCircle: { width: 74, height: 74, borderRadius: 37, backgroundColor: PETROLEO, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: BORDER, position: 'relative' },
+  avatarCircleFilled: { borderColor: VERDE_VIVO, borderWidth: 2 },
+  fotoAvatar: { width: '100%', height: '100%', borderRadius: 37 },
+  editBadge: { position: 'absolute', bottom: 0, right: 0, backgroundColor: VERDE_VIVO, width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: CREAM },
+  userInfo: { marginLeft: 16, flex: 1 },
+  name: { fontSize: 22, fontWeight: '700', color: PETROLEO, letterSpacing: -0.5 },
+  avisoText: { fontSize: 13, color: VERDE_VIVO, marginTop: 2, fontWeight: '700' },
+  cardDetails: { backgroundColor: WHITE, borderRadius: 16, padding: 20, borderWidth: 1.5, borderColor: BORDER, elevation: 2 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: PETROLEO, marginBottom: 20, letterSpacing: 0.5, textTransform: 'uppercase' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  iconContainer: { width: 36, height: 36, borderRadius: 8, backgroundColor: CREAM, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  textContainer: { flex: 1 },
+  infoLabel: { fontSize: 11, color: TEXT_MID, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: '600' },
+  infoValue: { fontSize: 15, color: PETROLEO, fontWeight: '500', marginTop: 1 },
+  subSection: { marginTop: 8, paddingTop: 16, borderTopWidth: 1, borderTopColor: BORDER },
+  subTitle: { fontSize: 11, fontWeight: '600', marginBottom: 8, color: TEXT_MID, textTransform: 'uppercase', letterSpacing: 0.5 },
+  badgePagamento: { flexDirection: 'row', alignItems: 'center', backgroundColor: CREAM, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start', gap: 6 },
+  infoValueBold: { fontWeight: '700', fontSize: 13, color: PETROLEO },
+  descricaoBox: { backgroundColor: CREAM, padding: 12, borderRadius: 8, marginTop: 2 },
+  descricaoText: { fontSize: 14, color: PETROLEO, fontStyle: 'italic', lineHeight: 20 },
+  button: { backgroundColor: VERDE_VIVO, paddingVertical: 14, borderRadius: 12, marginTop: 24, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', elevation: 3 },
+  buttonText: { fontSize: 16, color: WHITE, fontWeight: '600', letterSpacing: 0.3 }
 });

@@ -29,7 +29,7 @@ export default function ListaIntercorrenciasAdmin() {
             servico:id_servico ( nome_servico )
           )
         `)
-        .eq('status', 'pendente') // O SEGREDO: Só busca as que ainda não foram resolvidas
+        .eq('status', 'pendente') // Garante que itens resolvidos sumam imediatamente
         .order('criado_em', { ascending: false });
 
       if (error) throw error;
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#eee',
     borderLeftWidth: 6,
-    borderLeftColor: '#FFD700', // Cor dourada para indicar pendência
+    borderLeftColor: '#FFD700',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },

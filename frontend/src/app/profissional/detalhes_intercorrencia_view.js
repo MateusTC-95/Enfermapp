@@ -1,3 +1,4 @@
+//DetalhesIntercorrencia_profissional
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView, TextInput } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -16,7 +17,9 @@ export default function DetalhesIntercorrenciaProfissional() {
   const [imagemDefesa, setImagemDefesa] = useState(null);
 
   useEffect(() => {
-    fetchDetalhes();
+    if (id) {
+      fetchDetalhes();
+    }
   }, [id]);
 
   const fetchDetalhes = async () => {
@@ -35,8 +38,9 @@ export default function DetalhesIntercorrenciaProfissional() {
 
       if (error) throw error;
       setData(data);
-      // Se já houver uma defesa, preenche o campo (opcional)
-      if(data.descricao_profissional) setComentarioDefesa(data.descricao_profissional);
+      
+      // CORREÇÃO: Puxa o dado da coluna correta 'defesa_descricao'
+      if (data?.defesa_descricao) setComentarioDefesa(data.defesa_descricao);
     } catch (error) {
       console.error(error);
       Alert.alert("Erro", "Não foi possível carregar os detalhes.");
@@ -65,17 +69,16 @@ export default function DetalhesIntercorrenciaProfissional() {
     try {
       setEnviando(true);
       
-      // IMPORTANTE: Começa como null para não duplicar a imagem do cliente
-      let urlDefesaFinal = data.imagem_url_defesa || null; 
+      // CORREÇÃO: Lendo de 'defesa_imagem_url'
+      let urlDefesaFinal = data?.defesa_imagem_url || null; 
 
       if (imagemDefesa) {
-        // CONVERSÃO PARA BLOB (Resolve o erro de upload e problemas com .jfif/.jpg)
         const response = await fetch(imagemDefesa);
         const blob = await response.blob();
         
         const fileName = `defesa_${id}_${Date.now()}.jpg`;
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('intercorrencias')
           .upload(fileName, blob, {
             contentType: 'image/jpeg',
@@ -91,12 +94,12 @@ export default function DetalhesIntercorrenciaProfissional() {
         urlDefesaFinal = publicUrl.publicUrl;
       }
 
-      // ATUALIZAÇÃO NO BANCO
+      // CORREÇÃO: Enviando as chaves certas do banco ('defesa_descricao' e 'defesa_imagem_url')
       const { error } = await supabase
         .from('intercorrencia')
         .update({ 
-          descricao_profissional: comentarioDefesa,
-          imagem_url_defesa: urlDefesaFinal 
+          defesa_descricao: comentarioDefesa,
+          defesa_imagem_url: urlDefesaFinal 
         })
         .eq('id_intercorrencia', id);
 
@@ -106,7 +109,7 @@ export default function DetalhesIntercorrenciaProfissional() {
       router.back();
     } catch (error) {
       console.error("Erro no envio:", error);
-      Alert.alert("Erro", "Falha ao enviar defesa. Verifique as colunas do banco.");
+      Alert.alert("Erro", "Falha ao enviar defesa.");
     } finally {
       setEnviando(false);
     }
@@ -127,21 +130,22 @@ export default function DetalhesIntercorrenciaProfissional() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.cardInfo}>
-          <Text style={styles.label}>Serviço: <Text style={styles.value}>{data.agendamentos.servico.nome_servico}</Text></Text>
-          <Text style={styles.label}>Cliente: <Text style={styles.value}>{data.agendamentos.cliente.nome_usuario}</Text></Text>
+          <Text style={styles.label}>Serviço: <Text style={styles.value}>{data?.agendamentos?.servico?.nome_servico}</Text></Text>
+          <Text style={styles.label}>Cliente: <Text style={styles.value}>{data?.agendamentos?.cliente?.nome_usuario}</Text></Text>
           <Text style={styles.label}>Status: 
-            <Text style={[styles.value, { color: resolvida ? 'green' : '#e67e22' }]}> {data.status.toUpperCase()}</Text>
+            <Text style={[styles.value, { color: resolvida ? 'green' : '#e67e22' }]}> {data?.status?.toUpperCase()}</Text>
           </Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Motivo do Cliente:</Text>
-          <Text style={styles.motivoTxt}>{data.motivo_categoria}</Text>
-          <Text style={styles.descricaoTxt}>{data.descricao_cliente || "Sem descrição detalhada."}</Text>
+          <Text style={styles.motivoTxt}>{data?.motivo_categoria}</Text>
+          {/* CORREÇÃO: Mostra a coluna 'descricao' que foi quem abriu */}
+          <Text style={styles.descricaoTxt}>{data?.descricao || "Sem descrição detalhada."}</Text>
         </View>
 
         {/* PROVA DO CLIENTE */}
-        {data.imagem_url && (
+        {data?.imagem_url && (
           <View style={styles.imageContainer}>
             <Text style={styles.sectionTitle}>Foto do Cliente:</Text>
             <Image 
@@ -155,7 +159,7 @@ export default function DetalhesIntercorrenciaProfissional() {
         {resolvida && (
           <View style={styles.vereditoCard}>
             <Text style={styles.vereditoTitle}>Decisão do Administrador:</Text>
-            <Text style={styles.vereditoTxt}>{data.veredito}</Text>
+            <Text style={styles.vereditoTxt}>{data?.veredito}</Text>
           </View>
         )}
 
@@ -175,12 +179,13 @@ export default function DetalhesIntercorrenciaProfissional() {
             <TouchableOpacity style={styles.btnFoto} onPress={selecionarImagem}>
               <Ionicons name="camera" size={20} color="#fff" />
               <Text style={styles.btnFotoText}>
-                {imagemDefesa || data.imagem_url_defesa ? "Trocar Imagem" : "Anexar Prova"}
+                {imagemDefesa || data?.defesa_imagem_url ? "Trocar Imagem" : "Anexar Prova"}
               </Text>
             </TouchableOpacity>
 
-            {(imagemDefesa || data.imagem_url_defesa) && (
-              <Image source={{ uri: imagemDefesa || data.imagem_url_defesa }} style={styles.miniImg} />
+            {/* CORREÇÃO: Checa e renderiza usando defesa_imagem_url */}
+            {(imagemDefesa || data?.defesa_imagem_url) && (
+              <Image source={{ uri: imagemDefesa || data?.defesa_imagem_url }} style={styles.miniImg} />
             )}
 
             <TouchableOpacity 
